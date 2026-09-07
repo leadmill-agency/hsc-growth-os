@@ -6,17 +6,18 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 
 | Item | Status | Notes |
 |---|---|---|
-| DB schema (§9 entities) | in progress | |
+| DB schema (§9 entities) | **done** | drizzle migration 0000; Supabase PG in prod, PGlite local |
 | Auth (Supabase) | todo | blocked on Supabase account access (ask #1) |
-| Core nav + entity screens | todo | |
-| Evidence model | in progress | |
-| Ploybook / run / step / approval models | in progress | |
-| DB-backed job runner | in progress | |
-| AI abstraction (LLMClient + envelope) | todo | |
-| HSC knowledge base (§17) | todo | needs seed data (ask #2) |
-| Activity feed | in progress | |
-| Event system (§20) | in progress | |
-| **Gate: §26 Phase 0 AC** (dummy PB runs → pauses on approval → resumes → activity logged) | todo | |
+| Core nav + entity screens | **done** (minimal) | home/accounts/opportunities/ploybooks/runs/approvals; polish in Phase 1 |
+| Evidence model | **done** | `evidence` table + `saveEvidence` action |
+| Ploybook / run / step / approval models | **done** | |
+| DB-backed job runner | **done** | resumable, idempotent, retry; `src/lib/ploybooks/runner.ts` |
+| AI abstraction (LLMClient + envelope) | **done** | `messages.parse` + zod; FixtureLLMClient for tests; live call untested until API key present |
+| Guarded outbound send layer | **done** | refuses without ALLOW_EXTERNAL_SEND + approved approval; idempotent |
+| HSC knowledge base (§17) | todo | table exists (`knowledge_entries`); needs seed data (ask #2) |
+| Activity feed | **done** | per-entity + per-run, actor-attributed |
+| Event system (§20) | **done** | emit + table; trigger subscriptions come with PB05 |
+| **Gate: §26 Phase 0 AC** (dummy PB runs → pauses on approval → resumes → activity logged) | **PASSED 2026-09-06** | 7 vitest tests green + verified live in UI (PB00: launch → pause → approve → complete, full activity trail) |
 
 ## Ploybooks
 

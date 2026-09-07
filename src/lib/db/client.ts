@@ -16,7 +16,12 @@ async function buildPostgres() {
   }
   const { drizzle } = await import("drizzle-orm/pglite");
   const { PGlite } = await import("@electric-sql/pglite");
-  const dataDir = process.env.PGLITE_MEMORY === "true" ? undefined : ".data/dev";
+  let dataDir: string | undefined;
+  if (process.env.PGLITE_MEMORY !== "true") {
+    dataDir = ".data/dev";
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(dataDir, { recursive: true }); // PGlite won't create parent dirs itself
+  }
   const pglite = new PGlite(dataDir);
   return drizzle(pglite, { schema });
 }
