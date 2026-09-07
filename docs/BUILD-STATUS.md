@@ -41,6 +41,10 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | PB16 | Programmatic Local SEO | C | 6 | todo | existing SEO page | — |
 | PB17 | Content Opportunity + Page Builder | C | 6 | todo | GSC gap | — |
 | PB18 | Growth Operator | A | 7 | todo | full-system data | — |
+| PB21 | Creative Intelligence (genome schema first) | ext | 8 | todo | 50-experiment seed library | — |
+| PB19 | Social Content Engine | ext | 8 | todo | one real HSC project asset set | — |
+| PB20 | Social Engagement & Referral Engine | ext | 8 | todo | IG comment → opportunity path | — |
+| PB21 | Creative Intelligence (analytics loop) | ext | 8 | todo | PB19 experiment outcomes | — |
 
 ## Open asks (Rameel)
 

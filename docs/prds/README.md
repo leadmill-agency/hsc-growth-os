@@ -32,6 +32,13 @@ The master PRD (`hsc_growth_os_v1_prd.md`) and this pack are the plan of record 
 - PB17 — Content Opportunity + Page Builder
 - PB18 — Growth Operator
 
+### Social extension (added 2026-09-07, `social_extension/`)
+- PB19 — Social Content Engine (create → review → post → measure loop; ViralBench-derived, commercial reward function)
+- PB20 — Social Engagement & Referral Engine (comments/inbound → qualification → reply → CRM; NO cold-DM-from-likes — official-API constraint)
+- PB21 — Creative Intelligence Engine (content genome + organic/paid learning loop)
+- Supporting: `viralbench_architecture_to_pb19.md` (architecture teardown), `hsc_social_content_genome_50_experiments.md` (seed experiment library)
+- Internal build order per `social_extension/SOCIAL_EXTENSION_README.md`: PB21 genome schema → PB19 golden path → PB20 golden path → PB21 analytics
+
 ## Files
 - [PB01 — GC Pursuit](pb01_gc_pursuit_prd.md)
 - [PB02 — Commercial Development Pursuit](pb02_commercial_development_pursuit_prd.md)
