@@ -1,69 +1,130 @@
-import Image from "next/image";
+import Link from "next/link";
+import { getDb } from "@/lib/db/client";
+import {
+  accounts,
+  opportunities,
+  ploybookRuns,
+  approvals,
+  activities,
+} from "@/lib/db/schema";
+import { count, desc, eq } from "drizzle-orm";
+import { resolveApprovalAction } from "./actions";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+// §15.1 Home — Growth Command Center: KPI strip, Needs You, Agents Running, activity.
+
+export default async function Home() {
+  const db = await getDb();
+  const [accountCount] = await db.select({ n: count() }).from(accounts);
+  const [oppCount] = await db.select({ n: count() }).from(opportunities);
+  const pendingApprovals = await db.query.approvals.findMany({
+    where: eq(approvals.status, "pending"),
+    orderBy: desc(approvals.requestedAt),
+    limit: 10,
+  });
+  const runningRuns = await db.query.ploybookRuns.findMany({
+    where: eq(ploybookRuns.status, "running"),
+    limit: 10,
+  });
+  const waitingRuns = await db.query.ploybookRuns.findMany({
+    where: eq(ploybookRuns.status, "waiting_for_approval"),
+    limit: 10,
+  });
+  const recentActivity = await db.query.activities.findMany({
+    orderBy: desc(activities.occurredAt),
+    limit: 15,
+  });
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="max-w-4xl space-y-8">
+      <h1 className="text-xl font-semibold">Growth Command Center</h1>
+
+      <section className="grid grid-cols-4 gap-4">
+        {[
+          { label: "Accounts", value: accountCount.n },
+          { label: "Opportunities", value: oppCount.n },
+          { label: "Agents running", value: runningRuns.length + waitingRuns.length },
+          { label: "Needs you", value: pendingApprovals.length },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-lg border border-zinc-200 bg-white p-4">
+            <div className="text-2xl font-semibold">{kpi.value}</div>
+            <div className="text-xs text-zinc-500">{kpi.label}</div>
+          </div>
+        ))}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Needs you</h2>
+        {pendingApprovals.length === 0 ? (
+          <p className="text-sm text-zinc-500">No pending approvals.</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingApprovals.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3"
+              >
+                <div>
+                  <div className="text-sm font-medium">{a.title}</div>
+                  {a.summary && <div className="text-xs text-zinc-600">{a.summary}</div>}
+                </div>
+                <div className="flex gap-2">
+                  <form action={resolveApprovalAction}>
+                    <input type="hidden" name="approvalId" value={a.id} />
+                    <input type="hidden" name="decision" value="approved" />
+                    <button className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white">
+                      Approve
+                    </button>
+                  </form>
+                  <form action={resolveApprovalAction}>
+                    <input type="hidden" name="approvalId" value={a.id} />
+                    <input type="hidden" name="decision" value="rejected" />
+                    <button className="rounded bg-zinc-200 px-3 py-1 text-xs font-medium">
+                      Reject
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Agents running</h2>
+        {runningRuns.length + waitingRuns.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            Nothing running. Launch one from <Link href="/ploybooks" className="underline">Ploybooks</Link>.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {[...runningRuns, ...waitingRuns].map((r) => (
+              <li key={r.id}>
+                <Link href={`/runs/${r.id}`} className="underline">
+                  {r.ploybookKey}
+                </Link>{" "}
+                — {r.status} {r.currentStep ? `(${r.currentStep})` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Recent activity</h2>
+        <ul className="space-y-1 text-xs text-zinc-600">
+          {recentActivity.map((a) => (
+            <li key={a.id}>
+              <span className="font-mono text-zinc-400">
+                {a.occurredAt.toISOString().slice(5, 16).replace("T", " ")}
+              </span>{" "}
+              <span className="font-medium text-zinc-800">{a.action}</span>
+              {a.detail ? ` — ${a.detail}` : ""}
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }
