@@ -1,0 +1,155 @@
+import { z } from "zod";
+import type { Db } from "@/lib/db/client";
+import { contacts } from "@/lib/db/schema";
+import { getLLMClient } from "@/lib/ai/client";
+import type { ResearchBrief } from "./research";
+import { logActivity } from "@/lib/events";
+
+// Shared actions: stakeholder mapping, vendor-readiness checklist, outreach drafting.
+// Messaging rules (master PRD §17): ≤150 words, direct, evidence of research, one CTA,
+// no generic flattery, and copy must match HSC's real sales process.
+
+export const stakeholderPlanSchema = z.object({
+  roles_needed: z.array(
+    z.object({
+      role_type: z.string(),
+      why: z.string(),
+      found: z.boolean(),
+    })
+  ),
+  people: z.array(
+    z.object({
+      name: z.string(),
+      title: z.string().nullable(),
+      role_type: z.string(),
+      influence: z.number().min(0).max(100),
+      message_angle: z.string(),
+      status: z.enum(["verified", "inferred", "assumed", "unknown"]),
+    })
+  ),
+  missing_roles: z.array(z.string()),
+});
+
+export type StakeholderPlan = z.infer<typeof stakeholderPlanSchema>;
+
+export async function buildStakeholderMap(
+  db: Db,
+  params: {
+    accountId: string;
+    accountName: string;
+    brief: ResearchBrief;
+    ploybookRunId?: string;
+  }
+): Promise<StakeholderPlan> {
+  const llm = getLLMClient();
+  const plan = await llm.generateStructured({
+    system:
+      "You build a stakeholder map for a signage subcontractor pursuing a GC. Prefer " +
+      "project-specific estimating/preconstruction contacts over senior executives (PB01 §9). " +
+      "Use ONLY people from the research brief; never add names that are not in it. Roles worth " +
+      "seeking: estimator, preconstruction, project_manager, procurement, project_executive. " +
+      "Mark missing roles explicitly.",
+    prompt:
+      `Account: ${params.accountName}\n\nResearch brief people:\n` +
+      JSON.stringify(params.brief.people) +
+      `\n\nProjects:\n` +
+      JSON.stringify(params.brief.projects) +
+      `\n\nBuild the stakeholder map.`,
+    schema: stakeholderPlanSchema,
+    effort: "low",
+  });
+
+  for (const person of plan.people) {
+    const [first, ...rest] = person.name.split(" ");
+    await db.insert(contacts).values({
+      accountId: params.accountId,
+      firstName: first,
+      lastName: rest.join(" ") || null,
+      title: person.title,
+      roleType: person.role_type,
+      influenceScore: Math.round(person.influence),
+      source: "pb01_research",
+    });
+  }
+
+  await logActivity(db, {
+    entityType: "account",
+    entityId: params.accountId,
+    action: "stakeholder_map.created",
+    detail: `${plan.people.length} people, missing roles: ${plan.missing_roles.join(", ") || "none"}`,
+    ploybookRunId: params.ploybookRunId,
+  });
+
+  return plan;
+}
+
+// Vendor-readiness checklist (PB01 §5.4): fixed HSC items; status is unknown until verified.
+export const READINESS_ITEMS = [
+  "W-9 (generated fresh per signup — HSC process)",
+  "Certificate of Insurance (issued per GC at signup)",
+  "UL certification documents",
+  "References / past project list",
+  "Trade codes / scope classification",
+  "Bonding capacity (if required)",
+  "GC vendor portal enrollment",
+  "Prequalification form (GC-specific)",
+] as const;
+
+export interface ReadinessChecklist {
+  items: { item: string; status: "ready" | "needs_action" | "unknown"; note?: string }[];
+  blockers: string[];
+}
+
+export function buildReadinessChecklist(gcRequirementsFromResearch: string[]): ReadinessChecklist {
+  const items: ReadinessChecklist["items"] = READINESS_ITEMS.map((item) => ({
+    item,
+    status: item.includes("W-9") || item.includes("Insurance") ? "needs_action" : "unknown",
+    note: item.includes("W-9") || item.includes("Insurance") ? "generated per-GC at signup" : undefined,
+  }));
+  for (const req of gcRequirementsFromResearch) {
+    items.push({ item: `GC-specific: ${req}`, status: "unknown" });
+  }
+  return { items, blockers: [] };
+}
+
+export const outreachDraftSchema = z.object({
+  subject: z.string(),
+  body: z.string(),
+  alternate_subject: z.string(),
+  alternate_body: z.string(),
+  target_contact: z.string().nullable(),
+  rationale: z.string(),
+  word_count: z.number(),
+});
+
+export type OutreachDraft = z.infer<typeof outreachDraftSchema>;
+
+export async function draftOutreach(params: {
+  accountName: string;
+  projectName?: string;
+  brief: ResearchBrief;
+  stakeholders: StakeholderPlan;
+}): Promise<OutreachDraft> {
+  const llm = getLLMClient();
+  return llm.generateStructured({
+    system:
+      "You draft cold outreach for Houston Sign Crafters: UL-certified sign manufacturer, built " +
+      "in Houston, 5-year warranty, in-house permitting and installation. Rules: 120 words max, " +
+      "one clear CTA (bid access or a short call), show the research was done with ONE specific " +
+      "verified fact, no flattery, no jargon, plain English. NEVER promise instant quotes or " +
+      "mockups before a site survey — the real process is call, then survey, then mockup with " +
+      "itemized estimate. Use only facts from the brief; if a fact is not verified, do not state " +
+      "it as fact. The alternate is a relationship-building variant. Set word_count to the body's " +
+      "actual word count.",
+    prompt:
+      `Account: ${params.accountName}\nProject: ${params.projectName ?? "unknown"}\n\n` +
+      `Brief:\n${JSON.stringify({
+        company: params.brief.company,
+        signals: params.brief.signals,
+        projects: params.brief.projects,
+      })}\n\nBest contact:\n${JSON.stringify(params.stakeholders.people[0] ?? null)}\n\n` +
+      `Draft the bid-access email and the relationship alternate.`,
+    schema: outreachDraftSchema,
+    effort: "medium",
+  });
+}

@@ -4,7 +4,7 @@ import "@/lib/ploybooks";
 import { listPloybooks } from "@/lib/ploybooks/registry";
 import { ploybookRuns } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
-import { launchPloybookAction, retryRunAction } from "../actions";
+import { launchPloybookAction, retryRunAction, resumeRunAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +75,12 @@ export default async function PloybooksPage() {
                     <form action={retryRunAction}>
                       <input type="hidden" name="runId" value={r.id} />
                       <button className="rounded bg-zinc-200 px-2 py-1 text-xs">Retry</button>
+                    </form>
+                  )}
+                  {(r.status === "running" || r.status === "queued") && (
+                    <form action={resumeRunAction}>
+                      <input type="hidden" name="runId" value={r.id} />
+                      <button className="rounded bg-zinc-200 px-2 py-1 text-xs">Resume</button>
                     </form>
                   )}
                 </td>

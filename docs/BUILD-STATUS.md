@@ -23,9 +23,9 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 
 | PB | Name | Tier | Phase | Status | Fixture | AC tests |
 |---|---|---|---|---|---|---|
-| PB01 | GC Pursuit | A | 1 | todo | Harvey Cleary / UH | — |
-| PB05 | Opportunity Radar | A | 1 | todo | mixed-signal batch | — |
-| PB09 | Account Research Brief | B | 1 | todo | Harvey Cleary | — |
+| PB01 | GC Pursuit | A | 1 | **MVP done 2026-09-07** | Harvey Cleary / UH | golden-path suite green + LIVE run verified (real OpenAI research → real contacts → 88-word draft → approval → completed). Outreach send stays draft-only until sending domain + adapter exist. |
+| PB05 | Opportunity Radar | A | 1 | **MVP done 2026-09-07** (manual-signal slice) | Harvey signal | parse→dedupe→score→suggest verified live; scheduled TDLR/CoH/PlanHub ingestion lands Phase 2+ |
+| PB09 | Account Research Brief | B | 1 | **MVP done 2026-09-07** | Harvey Cleary | shared action + standalone ploybook; evidence writebacks |
 | PB02 | Commercial Development Pursuit | B | 2 | todo | real Houston development TBD | — |
 | PB03 | Franchise Expansion | B | 2 | todo | OAKBERRY or Wonder (radar §16) | — |
 | PB04 | Facility Portfolio Pursuit | B | 2 | todo | HCA CareNow (radar §16) | — |

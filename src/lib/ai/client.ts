@@ -128,12 +128,27 @@ export function setLLMClientForTests(client: LLMClient | null) {
   override = client;
 }
 
+let fallbackPromise: Promise<LLMClient> | null = null;
+
 export function getLLMClient(): LLMClient {
   if (override) return override;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. In tests, inject a FixtureLLMClient via setLLMClientForTests()."
-    );
+  if (process.env.ANTHROPIC_API_KEY) return new AnthropicLLMClient();
+  if (process.env.OPENAI_API_KEY) {
+    // Per Rameel 2026-09-07: OpenAI powers live AI work while no Anthropic key is configured.
+    if (!fallbackPromise) {
+      fallbackPromise = import("./openai-client").then((m) => new m.OpenAILLMClient());
+    }
+    // Wrap the async import in a lazy proxy so the sync signature is preserved.
+    return {
+      async generateStructured(params) {
+        return (await fallbackPromise!).generateStructured(params);
+      },
+      async generateText(params) {
+        return (await fallbackPromise!).generateText(params);
+      },
+    };
   }
-  return new AnthropicLLMClient();
+  throw new Error(
+    "No ANTHROPIC_API_KEY or OPENAI_API_KEY set. In tests, inject a FixtureLLMClient via setLLMClientForTests()."
+  );
 }
