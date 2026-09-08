@@ -133,6 +133,31 @@ describe("Harvey Golden Path", () => {
     expect(emitted.map((e) => e.eventType)).toContain("outreach.approved");
   });
 
+  it("PB05 anchors a no-company permit signal on the project instead of dropping or fabricating", async () => {
+    setLLMClientForTests(
+      new FixtureLLMClient({
+        structured: () => ({
+          ...harveySignalParse,
+          company_name: null,
+          company_type: "unknown",
+          project_name: "Office Warehouse at Rankin",
+          estimated_relevance_score: 75,
+        }),
+      })
+    );
+    const runId = await launchRun(db, {
+      ploybookKey: "pb05_opportunity_radar",
+      triggerPayload: { signalText: "TDLR TABS filing ...", source: "tdlr" },
+    });
+    expect(await executeRun(db, runId)).toBe("completed");
+    const opps = await db.select().from(opportunities);
+    expect(opps).toHaveLength(1);
+    expect(opps[0].accountId).toBeNull();
+    expect(opps[0].name).toContain("owner unknown");
+    expect(opps[0].nextAction).toContain("Identify owner/GC");
+    expect(await db.select().from(accounts)).toHaveLength(0); // nothing fabricated
+  });
+
   it("PB01 records a rejection without losing the research", async () => {
     const runId = await launchRun(db, {
       ploybookKey: "pb01_gc_pursuit",

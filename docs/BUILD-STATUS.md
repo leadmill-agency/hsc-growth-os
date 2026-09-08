@@ -24,11 +24,11 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | PB | Name | Tier | Phase | Status | Fixture | AC tests |
 |---|---|---|---|---|---|---|
 | PB01 | GC Pursuit | A | 1 | **MVP done 2026-09-07** | Harvey Cleary / UH | golden-path suite green + LIVE run verified (real OpenAI research → real contacts → 88-word draft → approval → completed). Outreach send stays draft-only until sending domain + adapter exist. |
-| PB05 | Opportunity Radar | A | 1 | **MVP done 2026-09-07** (manual-signal slice) | Harvey signal | parse→dedupe→score→suggest verified live; scheduled TDLR/CoH/PlanHub ingestion lands Phase 2+ |
+| PB05 | Opportunity Radar | A | 1 | **MVP done 2026-09-07** + **TDLR feed live** | Harvey signal + real TABS filing | parse→dedupe→score→suggest verified live; `npm run radar:tdlr` pulls Greater-Houston TABS filings (public JSON endpoint, county/city code tables vendored); no-company permit signals anchor on the project with account null ("identify owner/GC" next action). CoH + PlanHub ingestion still todo |
 | PB09 | Account Research Brief | B | 1 | **MVP done 2026-09-07** | Harvey Cleary | shared action + standalone ploybook; evidence writebacks |
-| PB02 | Commercial Development Pursuit | B | 2 | todo | real Houston development TBD | — |
-| PB03 | Franchise Expansion | B | 2 | todo | OAKBERRY or Wonder (radar §16) | — |
-| PB04 | Facility Portfolio Pursuit | B | 2 | todo | HCA CareNow (radar §16) | — |
+| PB02 | Commercial Development Pursuit | B | 2 | **MVP done 2026-09-07** | Manvel Town Center | players+tenants→linked records; revenue estimate stored as ASSUMPTION evidence; developer-anchored recommendation |
+| PB03 | Franchise Expansion | B | 2 | **MVP done 2026-09-07** | OAKBERRY | brand→strategic score→child location opps (evidence-backed only)→buying-path motion |
+| PB04 | Facility Portfolio Pursuit | B | 2 | **MVP done 2026-09-07** | HCA CareNow | operator→properties+contacts→strategic score→incumbent-aware portfolio motion |
 | PB06 | Company Swarm | B | 3 | todo | strategic account TBD | — |
 | PB07 | ABM Account Page | B | 3 | todo | — | — |
 | PB08 | High-Intent Visitor | C | 3 | todo | needs RB2B or manual visitor data | — |

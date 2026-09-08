@@ -16,12 +16,26 @@ function executeInBackground(db: Db, runId: string) {
   });
 }
 
+// Each ploybook's primary manual input maps onto its trigger payload.
+const inputFieldByPloybook: Record<string, string> = {
+  pb01_gc_pursuit: "gcName",
+  pb02_commercial_development: "developmentName",
+  pb03_franchise_expansion: "brandName",
+  pb04_facility_portfolio: "operatorName",
+  pb05_opportunity_radar: "signalText",
+  pb09_account_research: "accountName",
+};
+
 export async function launchPloybookAction(formData: FormData) {
   const key = String(formData.get("ploybookKey") ?? "");
+  const input = String(formData.get("input") ?? "").trim();
+  const field = inputFieldByPloybook[key];
+  if (field && !input) return; // this ploybook needs its input to run
   const db = await getDb();
   const runId = await launchRun(db, {
     ploybookKey: key,
     triggerType: "manual",
+    triggerPayload: field && input ? { [field]: input } : {},
     initiatedBy: "user",
   });
   executeInBackground(db, runId);

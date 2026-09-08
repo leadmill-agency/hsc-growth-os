@@ -1,5 +1,5 @@
 import type { Db } from "@/lib/db/client";
-import { accounts, projects, opportunities, evidence } from "@/lib/db/schema";
+import { accounts, projects, opportunities, evidence, properties, relationships } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { logActivity } from "@/lib/events";
 
@@ -175,6 +175,85 @@ export async function createOpportunity(
     ploybookRunId: input.ploybookRunId,
   });
   return { opportunity, created: true as const };
+}
+
+/** Find-or-create a property (persistent physical location). Dedupes by (address+city) or name. */
+export async function createProperty(
+  db: Db,
+  input: {
+    name?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    type?: string;
+    ownerAccountId?: string;
+    propertyManagerAccountId?: string;
+  }
+) {
+  if (input.address && input.city) {
+    const existing = await db.query.properties.findFirst({
+      where: and(eq(properties.address, input.address), eq(properties.city, input.city)),
+    });
+    if (existing) return { property: existing, created: false as const };
+  } else if (input.name) {
+    const existing = await db.query.properties.findFirst({
+      where: eq(properties.name, input.name),
+    });
+    if (existing) return { property: existing, created: false as const };
+  }
+  const [property] = await db
+    .insert(properties)
+    .values({
+      name: input.name,
+      address: input.address,
+      city: input.city,
+      state: input.state ?? "TX",
+      zip: input.zip,
+      type: input.type,
+      ownerAccountId: input.ownerAccountId,
+      propertyManagerAccountId: input.propertyManagerAccountId,
+    })
+    .returning();
+  return { property, created: true as const };
+}
+
+/** Record a typed relationship edge (§9.10). Idempotent per (from, type, to). */
+export async function createRelationship(
+  db: Db,
+  input: {
+    fromEntityType: string;
+    fromEntityId: string;
+    relationshipType: string;
+    toEntityType: string;
+    toEntityId: string;
+    strength?: number;
+    confidence?: number;
+    source?: string;
+  }
+) {
+  const existing = await db.query.relationships.findFirst({
+    where: and(
+      eq(relationships.fromEntityId, input.fromEntityId),
+      eq(relationships.relationshipType, input.relationshipType),
+      eq(relationships.toEntityId, input.toEntityId)
+    ),
+  });
+  if (existing) return { relationship: existing, created: false as const };
+  const [relationship] = await db
+    .insert(relationships)
+    .values({
+      fromEntityType: input.fromEntityType,
+      fromEntityId: input.fromEntityId,
+      relationshipType: input.relationshipType,
+      toEntityType: input.toEntityType,
+      toEntityId: input.toEntityId,
+      strength: input.strength,
+      confidence: input.confidence?.toString(),
+      source: input.source,
+    })
+    .returning();
+  return { relationship, created: true as const };
 }
 
 /** Store source evidence for a field (§9.15). Never overwrites — evidence accumulates. */

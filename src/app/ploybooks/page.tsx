@@ -8,6 +8,15 @@ import { launchPloybookAction, retryRunAction, resumeRunAction } from "../action
 
 export const dynamic = "force-dynamic";
 
+const inputPlaceholders: Record<string, string> = {
+  pb01_gc_pursuit: "GC name, e.g. Harvey Cleary",
+  pb02_commercial_development: "Development name, e.g. Manvel Town Center",
+  pb03_franchise_expansion: "Brand name, e.g. OAKBERRY",
+  pb04_facility_portfolio: "Operator name, e.g. HCA Houston Healthcare",
+  pb05_opportunity_radar: "Paste a raw signal…",
+  pb09_account_research: "Account name",
+};
+
 const statusColor: Record<string, string> = {
   completed: "text-emerald-700",
   failed: "text-red-700",
@@ -35,8 +44,16 @@ export default async function PloybooksPage() {
             <div className="mt-2 text-xs text-zinc-400">
               {def.steps.length} steps · v{def.version}
             </div>
-            <form action={launchPloybookAction} className="mt-3">
+            <form action={launchPloybookAction} className="mt-3 flex gap-2">
               <input type="hidden" name="ploybookKey" value={def.key} />
+              {inputPlaceholders[def.key] && (
+                <input
+                  name="input"
+                  required
+                  placeholder={inputPlaceholders[def.key]}
+                  className="flex-1 rounded border border-zinc-300 px-2 py-1 text-xs"
+                />
+              )}
               <button className="rounded bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white">
                 Run now
               </button>

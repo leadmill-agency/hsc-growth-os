@@ -61,14 +61,24 @@ export const pb05OpportunityRadar: PloybookDefinition = {
       async run(ctx) {
         const p = ctx.triggerPayload as { signalText?: string; sourceUrl?: string; source?: string };
         const parsed = ctx.priorOutputs["parse_signal"].parsed as z.infer<typeof signalParseSchema>;
-        if (parsed.trade_relevance === "irrelevant" || !parsed.company_name) {
-          return { kind: "skipped", reason: "Signal not relevant to HSC or no company identified" };
+        if (parsed.trade_relevance === "irrelevant") {
+          return { kind: "skipped", reason: "Signal not relevant to HSC" };
         }
-        const { account } = await createAccount(ctx.db, {
-          name: parsed.company_name,
-          accountType: parsed.company_type === "unknown" ? "prospect" : parsed.company_type,
-          ploybookRunId: ctx.runId,
-        });
+        if (!parsed.company_name && !parsed.project_name) {
+          return { kind: "skipped", reason: "No company or project identified in signal" };
+        }
+        // Permit-style signals (e.g. TDLR) often name a facility/project but no company.
+        // Anchor on the project and leave the account null — identifying the owner/GC is
+        // the recommended next action, never a fabricated account (§5.4).
+        const account = parsed.company_name
+          ? (
+              await createAccount(ctx.db, {
+                name: parsed.company_name,
+                accountType: parsed.company_type === "unknown" ? "prospect" : parsed.company_type,
+                ploybookRunId: ctx.runId,
+              })
+            ).account
+          : null;
         const { project } = parsed.project_name
           ? await createProject(ctx.db, {
               name: parsed.project_name,
@@ -79,9 +89,12 @@ export const pb05OpportunityRadar: PloybookDefinition = {
               ploybookRunId: ctx.runId,
             })
           : { project: null };
+        const oppName = account
+          ? `${account.name}${project ? ` — ${project.name}` : ""}`
+          : `${project!.name} (owner unknown)`;
         const { opportunity, created } = await createOpportunity(ctx.db, {
-          name: `${account.name}${project ? ` — ${project.name}` : ""}`,
-          accountId: account.id,
+          name: oppName,
+          accountId: account?.id,
           projectId: project?.id,
           opportunityType: parsed.opportunity_type,
           stage: "discovered",
@@ -106,7 +119,7 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         });
         return {
           kind: "completed",
-          outputs: { opportunityId: opportunity.id, accountId: account.id, deduped: false },
+          outputs: { opportunityId: opportunity.id, accountId: account?.id ?? null, deduped: false },
         };
       },
     },
@@ -124,8 +137,9 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           .update(opportunities)
           .set({
             overallScore: Math.round(parsed.estimated_relevance_score),
-            nextAction:
-              parsed.suggested_ploybook === "none"
+            nextAction: !resolved.accountId
+              ? "Identify owner/GC first (research)"
+              : parsed.suggested_ploybook === "none"
                 ? "review"
                 : `Launch ${parsed.suggested_ploybook}`,
             updatedAt: new Date(),
