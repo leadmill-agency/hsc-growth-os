@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { opportunities } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
-import { submitSignalAction, pursueOpportunityAction } from "../actions";
+import { submitSignalAction, pursueOpportunityAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 

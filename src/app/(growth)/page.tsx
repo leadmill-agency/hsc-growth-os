@@ -8,7 +8,7 @@ import {
   activities,
 } from "@/lib/db/schema";
 import { count, desc, eq } from "drizzle-orm";
-import { resolveApprovalAction } from "./actions";
+import { resolveApprovalAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 

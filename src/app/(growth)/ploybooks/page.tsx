@@ -4,7 +4,7 @@ import "@/lib/ploybooks";
 import { listPloybooks } from "@/lib/ploybooks/registry";
 import { ploybookRuns } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
-import { launchPloybookAction, retryRunAction, resumeRunAction } from "../actions";
+import { launchPloybookAction, retryRunAction, resumeRunAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,9 @@ const inputPlaceholders: Record<string, string> = {
   pb03_franchise_expansion: "Brand name, e.g. OAKBERRY",
   pb04_facility_portfolio: "Operator name, e.g. HCA Houston Healthcare",
   pb05_opportunity_radar: "Paste a raw signal…",
+  pb06_company_swarm: "Account name (needs/discovers contacts)",
+  pb07_abm_page: "Account name",
+  pb08_high_intent_visitor: "Company name (visitor)",
   pb09_account_research: "Account name",
 };
 

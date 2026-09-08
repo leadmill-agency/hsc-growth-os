@@ -23,6 +23,9 @@ const inputFieldByPloybook: Record<string, string> = {
   pb03_franchise_expansion: "brandName",
   pb04_facility_portfolio: "operatorName",
   pb05_opportunity_radar: "signalText",
+  pb06_company_swarm: "accountName",
+  pb07_abm_page: "accountName",
+  pb08_high_intent_visitor: "companyName",
   pb09_account_research: "accountName",
 };
 

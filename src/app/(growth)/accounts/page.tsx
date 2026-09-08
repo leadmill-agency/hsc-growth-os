@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { accounts } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
-import { createAccountAction } from "../actions";
+import { createAccountAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 

@@ -219,6 +219,24 @@ export const evidence = pgTable("evidence", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// PB07 — private ABM account pages. Served at /p/[token], noindex, draft until approved.
+export const abmPages = pgTable("abm_pages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id")
+    .notNull()
+    .references(() => accounts.id),
+  opportunityId: uuid("opportunity_id").references(() => opportunities.id),
+  slug: text("slug").notNull(),
+  publicToken: text("public_token").notNull().unique(),
+  title: text("title").notNull(),
+  content: jsonb("content").notNull(),
+  status: text("status").notNull().default("draft"), // draft | published | archived
+  viewCount: integer("view_count").notNull().default(0),
+  lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // §17 — HSC knowledge base entries (company facts, capabilities, proof, messaging rules)
 export const knowledgeEntries = pgTable("knowledge_entries", {
   id: uuid("id").primaryKey().defaultRandom(),

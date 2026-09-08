@@ -5,6 +5,9 @@ import { pb02CommercialDevelopment } from "./pb02-commercial-development/definit
 import { pb03FranchiseExpansion } from "./pb03-franchise-expansion/definition";
 import { pb04FacilityPortfolio } from "./pb04-facility-portfolio/definition";
 import { pb05OpportunityRadar } from "./pb05-radar/definition";
+import { pb06CompanySwarm } from "./pb06-company-swarm/definition";
+import { pb07AbmPage } from "./pb07-abm-page/definition";
+import { pb08HighIntentVisitor } from "./pb08-high-intent-visitor/definition";
 import { pb09AccountResearch } from "./pb09-account-research/definition";
 
 // Register all ploybooks. Import this module once (server startup / test setup)
@@ -16,6 +19,9 @@ registerPloybook(pb02CommercialDevelopment);
 registerPloybook(pb03FranchiseExpansion);
 registerPloybook(pb04FacilityPortfolio);
 registerPloybook(pb05OpportunityRadar);
+registerPloybook(pb06CompanySwarm);
+registerPloybook(pb07AbmPage);
+registerPloybook(pb08HighIntentVisitor);
 registerPloybook(pb09AccountResearch);
 
 export * from "./types";

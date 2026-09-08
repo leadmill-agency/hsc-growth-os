@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { approvals } from "@/lib/db/schema";
 import { desc, eq, ne } from "drizzle-orm";
-import { resolveApprovalAction } from "../actions";
+import { resolveApprovalAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 

@@ -29,9 +29,9 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | PB02 | Commercial Development Pursuit | B | 2 | **MVP done 2026-09-07** | Manvel Town Center | players+tenants→linked records; revenue estimate stored as ASSUMPTION evidence; developer-anchored recommendation |
 | PB03 | Franchise Expansion | B | 2 | **MVP done 2026-09-07** | OAKBERRY | brand→strategic score→child location opps (evidence-backed only)→buying-path motion |
 | PB04 | Facility Portfolio Pursuit | B | 2 | **MVP done 2026-09-07** | HCA CareNow | operator→properties+contacts→strategic score→incumbent-aware portfolio motion |
-| PB06 | Company Swarm | B | 3 | todo | strategic account TBD | — |
-| PB07 | ABM Account Page | B | 3 | todo | — | — |
-| PB08 | High-Intent Visitor | C | 3 | todo | needs RB2B or manual visitor data | — |
+| PB06 | Company Swarm | B | 3 | **MVP done 2026-09-07** | 4-contact GC fixture | plan→distinct drafts (similarity-validated in code, fails visibly on dupes)→ONE swarm approval |
+| PB07 | ABM Account Page | B | 3 | **MVP done 2026-09-07** | Harvey Cleary (live) | private noindex page at /p/[token], publish behind approval, per-view tracking (interaction + event); proof points placeholder until real portfolio seeded; verified live |
+| PB08 | High-Intent Visitor | C | 3 | **MVP done 2026-09-07** | deterministic page-intent fixture | /api/visitor intake (token-guarded) ready for RB2B webhook; RB2B script installed on website repo (commit 40c5e2e, needs push+deploy) |
 | PB10 | Incoming Bid | A | 4 | todo | historical HSC bid pkg (ask #2) | — |
 | PB11 | Bid Package Analyzer | A | 4 | todo | same bid pkg; Jamal validates | — |
 | PB12 | Bid QA + Submission | C | 4 | todo | — | — |
