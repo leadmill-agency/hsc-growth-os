@@ -21,6 +21,9 @@ const inputPlaceholders: Record<string, string> = {
   pb10_incoming_bid: "Paste the bid invitation text…",
   pb11_bid_analyzer: "Absolute path to the bid documents folder",
   pb12_bid_qa: "Bid ID (from the PB10 run outputs)",
+  pb13_bid_followup: "Bid ID (submitted bid)",
+  pb14_deal_room: "Opportunity ID",
+  pb15_business_case: "Opportunity ID",
 };
 
 const statusColor: Record<string, string> = {

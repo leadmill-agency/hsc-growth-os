@@ -15,6 +15,13 @@
       "when": 1788836336001,
       "tag": "0001_adorable_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788993952896,
+      "tag": "0002_slow_demogoblin",
+      "breakpoints": true
     }
   ]
 }

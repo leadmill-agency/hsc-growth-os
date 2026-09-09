@@ -30,6 +30,9 @@ const inputFieldByPloybook: Record<string, string> = {
   pb10_incoming_bid: "inviteText",
   pb11_bid_analyzer: "folderPath",
   pb12_bid_qa: "bidId",
+  pb13_bid_followup: "bidId",
+  pb14_deal_room: "opportunityId",
+  pb15_business_case: "opportunityId",
 };
 
 export async function launchPloybookAction(formData: FormData) {

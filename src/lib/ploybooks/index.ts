@@ -12,6 +12,9 @@ import { pb09AccountResearch } from "./pb09-account-research/definition";
 import { pb10IncomingBid } from "./pb10-incoming-bid/definition";
 import { pb11BidAnalyzer } from "./pb11-bid-analyzer/definition";
 import { pb12BidQa } from "./pb12-bid-qa/definition";
+import { pb13BidFollowup } from "./pb13-bid-followup/definition";
+import { pb14DealRoom } from "./pb14-deal-room/definition";
+import { pb15BusinessCase } from "./pb15-business-case/definition";
 
 // Register all ploybooks. Import this module once (server startup / test setup)
 // before using the runner. Remaining PBs register here as they are built.
@@ -29,6 +32,9 @@ registerPloybook(pb09AccountResearch);
 registerPloybook(pb10IncomingBid);
 registerPloybook(pb11BidAnalyzer);
 registerPloybook(pb12BidQa);
+registerPloybook(pb13BidFollowup);
+registerPloybook(pb14DealRoom);
+registerPloybook(pb15BusinessCase);
 
 export * from "./types";
 export * from "./registry";

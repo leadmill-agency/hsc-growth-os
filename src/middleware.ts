@@ -21,5 +21,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|p/|api/visitor|api/rb2b|_next/|favicon\\.ico|.*\\.(?:png|jpg|svg|ico|css|js)$).*)"],
+  matcher: ["/((?!login|p/|d/|api/visitor|api/rb2b|_next/|favicon\\.ico|.*\\.(?:png|jpg|svg|ico|css|js)$).*)"],
 };

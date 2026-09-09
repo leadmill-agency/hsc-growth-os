@@ -219,6 +219,20 @@ export const evidence = pgTable("evidence", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// PB13 — scheduled bid follow-ups (Day 2 / 7 / 14 / 30 cadence, configurable).
+export const followups = pgTable("followups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bidId: uuid("bid_id").references(() => bids.id),
+  opportunityId: uuid("opportunity_id").references(() => opportunities.id),
+  kind: text("kind").notNull(), // receipt_confirmation | status_followup | followup | award_check
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("pending"), // pending | drafted | sent | done | cancelled
+  draft: jsonb("draft"),
+  approvalId: uuid("approval_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // PB07 — private ABM account pages. Served at /p/[token], noindex, draft until approved.
 export const abmPages = pgTable("abm_pages", {
   id: uuid("id").primaryKey().defaultRandom(),
