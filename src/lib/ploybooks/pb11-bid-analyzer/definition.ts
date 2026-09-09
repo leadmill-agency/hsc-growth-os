@@ -48,6 +48,31 @@ const rfqDraftSchema = z.object({
 
 const MAX_ANALYSIS_CHARS = 60_000;
 const MAX_RELEVANT_DOCS = 12;
+const EXCERPT_KEYWORDS = /\b(sign|signage|canop\w*|awning\w*|monument|pylon|storefront|channel letter\w*)\b/gi;
+
+/**
+ * Budgeted excerpt of a document. Small docs pass whole; large docs (combined plan
+ * sets) return keyword-centered windows so signage details buried mid-set aren't
+ * lost to a head slice. Falls back to the head when no keywords hit.
+ */
+export function relevantExcerpts(text: string, budget: number): string {
+  if (text.length <= budget) return text;
+  const windows: { start: number; end: number }[] = [];
+  for (const match of text.matchAll(EXCERPT_KEYWORDS)) {
+    const start = Math.max(0, match.index - 600);
+    const end = Math.min(text.length, match.index + 700);
+    const last = windows[windows.length - 1];
+    if (last && start <= last.end) last.end = end;
+    else windows.push({ start, end });
+  }
+  if (windows.length === 0) return text.slice(0, budget);
+  let out = "";
+  for (const w of windows) {
+    if (out.length >= budget) break;
+    out += `\n[…]\n${text.slice(w.start, w.end)}`;
+  }
+  return out.slice(0, budget);
+}
 
 export const pb11BidAnalyzer: PloybookDefinition = {
   key: "pb11_bid_analyzer",
@@ -105,7 +130,7 @@ export const pb11BidAnalyzer: PloybookDefinition = {
           }
           const text = await readFile(doc.textPath, "utf8").catch(() => "");
           const budget = Math.floor(MAX_ANALYSIS_CHARS / relevant.length);
-          corpus += `\n\n===== ${doc.filename} (${doc.documentType}) =====\n${text.slice(0, budget)}`;
+          corpus += `\n\n===== ${doc.filename} (${doc.documentType}) =====\n${relevantExcerpts(text, budget)}`;
         }
         const p = ctx.triggerPayload as { projectName?: string };
         const llm = getLLMClient();

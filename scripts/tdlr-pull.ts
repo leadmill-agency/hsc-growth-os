@@ -1,11 +1,6 @@
-// Daily TDLR radar pull: fetch recent Greater Houston TABS filings and feed each
-// through PB05 Opportunity Radar. Run manually or on a schedule:
-//   npm run radar:tdlr           (defaults: 3 days back, >= $200k, max 20)
-//   npm run radar:tdlr -- 7 500000 10   (sinceDays minCost maxResults)
-// Reads .env itself so it works from cron without a wrapper.
-
+// CLI wrapper around the shared TDLR runner.
+//   npm run radar:tdlr -- [sinceDays] [minCost] [maxResults]
 import { readFileSync } from "node:fs";
-import { fetchRecentHoustonProjects, formatTdlrSignal } from "../src/lib/integrations/tdlr/client";
 
 async function main() {
   try {
@@ -14,34 +9,19 @@ async function main() {
       if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
     }
   } catch {
-    // no .env — rely on process env
+    // rely on process env
   }
-
   const [sinceDays, minCost, maxResults] = process.argv.slice(2).map(Number);
   const { getDb } = await import("../src/lib/db/client");
-  await import("../src/lib/ploybooks");
-  const { launchRun, executeRun } = await import("../src/lib/ploybooks/runner");
-
+  const { runTdlrPull } = await import("../src/lib/integrations/tdlr/runner");
   const db = await getDb();
-  const projects = await fetchRecentHoustonProjects({
+  const results = await runTdlrPull(db, {
     sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
     minCost: Number.isFinite(minCost) ? minCost : undefined,
     maxResults: Number.isFinite(maxResults) ? maxResults : undefined,
   });
-  console.log(`TDLR: ${projects.length} qualifying filings`);
-
-  for (const project of projects) {
-    const { signalText, sourceUrl } = formatTdlrSignal(project);
-    const runId = await launchRun(db, {
-      ploybookKey: "pb05_opportunity_radar",
-      triggerType: "scheduled",
-      triggerPayload: { signalText, sourceUrl, source: "tdlr" },
-      initiatedBy: "system",
-    });
-    const status = await executeRun(db, runId);
-    console.log(`  ${project.ProjectNumber} ${project.ProjectName} → ${status}`);
-  }
-  console.log("Done.");
+  console.log(`TDLR: ${results.length} qualifying filings`);
+  for (const r of results) console.log(`  ${r.projectNumber} ${r.name} → ${r.status}`);
   process.exit(0);
 }
 

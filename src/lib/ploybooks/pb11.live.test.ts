@@ -11,7 +11,7 @@ import { asc, eq } from "drizzle-orm";
 // (canopy scope in spec 10538 + canopy sheets) is known.
 
 const live = process.env.LIVE === "1";
-const RTG_FOLDER = "/Users/rameel/Desktop/Rooms To Go - Baytown";
+const RTG_FOLDER = process.env.PB11_FOLDER ?? "/Users/rameel/Desktop/Rooms To Go - Baytown";
 
 describe.skipIf(!live)("PB11 live (real RTG package)", () => {
   it("ingests the full package and produces a real estimator brief + supplier RFQs", async () => {
@@ -24,7 +24,7 @@ describe.skipIf(!live)("PB11 live (real RTG package)", () => {
 
     const runId = await launchRun(db, {
       ploybookKey: "pb11_bid_analyzer",
-      triggerPayload: { folderPath: RTG_FOLDER, projectName: "Rooms To Go - Baytown (C.A. Walker)" },
+      triggerPayload: { folderPath: RTG_FOLDER, projectName: process.env.PB11_PROJECT ?? "Rooms To Go - Baytown (C.A. Walker)" },
     });
     const status = await executeRun(db, runId);
 

@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { opportunities } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
-import { submitSignalAction, pursueOpportunityAction } from "@/app/actions";
+import { submitSignalAction, pursueOpportunityAction, pullTdlrAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,14 @@ export default async function OpportunitiesPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-xl font-semibold">Opportunities</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Opportunities</h1>
+        <form action={pullTdlrAction}>
+          <button className="rounded border border-fog bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-signal">
+            Pull TDLR filings now
+          </button>
+        </form>
+      </div>
 
       <form
         action={submitSignalAction}

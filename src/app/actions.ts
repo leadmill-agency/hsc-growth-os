@@ -129,6 +129,13 @@ export async function pursueOpportunityAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function pullTdlrAction() {
+  const db = await getDb();
+  const { runTdlrPull } = await import("@/lib/integrations/tdlr/runner");
+  void runTdlrPull(db).catch((err) => console.error("[tdlr] manual pull failed:", err));
+  revalidatePath("/opportunities");
+}
+
 export async function createAccountAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;

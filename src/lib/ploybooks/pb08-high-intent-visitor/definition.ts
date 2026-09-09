@@ -1,7 +1,7 @@
 import type { PloybookDefinition } from "../types";
 import { createAccount, createOpportunity, saveEvidence } from "@/lib/actions/entities";
-import { accounts, opportunities } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { contacts, opportunities } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { emitEvent, logActivity } from "@/lib/events";
 
 // PB08 — High-Intent Visitor: identified-company website intent → outreach recommendation.
@@ -56,6 +56,7 @@ export const pb08HighIntentVisitor: PloybookDefinition = {
           website?: string;
           pagesVisited?: string[];
           visitCount?: number;
+          person?: { name?: string; title?: string; linkedinUrl?: string; email?: string };
         };
         if (!p.companyName) throw new Error("companyName is required");
         const { account, created } = await createAccount(ctx.db, {
@@ -63,6 +64,35 @@ export const pb08HighIntentVisitor: PloybookDefinition = {
           website: p.website,
           ploybookRunId: ctx.runId,
         });
+        // RB2B identifies people, not just companies — keep the person as a contact.
+        let contactId: string | null = null;
+        if (p.person?.name) {
+          const [first, ...rest] = p.person.name.split(" ");
+          const existing = await ctx.db.query.contacts.findFirst({
+            where: and(
+              eq(contacts.accountId, account.id),
+              eq(contacts.firstName, first),
+              eq(contacts.lastName, rest.join(" ") || "")
+            ),
+          });
+          if (existing) {
+            contactId = existing.id;
+          } else {
+            const [contact] = await ctx.db
+              .insert(contacts)
+              .values({
+                accountId: account.id,
+                firstName: first,
+                lastName: rest.join(" ") || null,
+                title: p.person.title,
+                linkedinUrl: p.person.linkedinUrl,
+                email: p.person.email,
+                source: "rb2b",
+              })
+              .returning();
+            contactId = contact.id;
+          }
+        }
         return {
           kind: "completed",
           outputs: {
@@ -70,6 +100,7 @@ export const pb08HighIntentVisitor: PloybookDefinition = {
             accountName: account.name,
             knownAccount: !created,
             strategicScore: account.strategicValueScore,
+            contactId,
           },
         };
       },
