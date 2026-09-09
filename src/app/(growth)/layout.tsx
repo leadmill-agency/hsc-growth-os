@@ -9,6 +9,7 @@ const nav = [
   { href: "/accounts", label: "Accounts" },
   { href: "/ploybooks", label: "Ploybooks" },
   { href: "/approvals", label: "Approvals" },
+  { href: "/guide", label: "Guide" },
 ];
 
 export default function GrowthLayout({ children }: { children: React.ReactNode }) {

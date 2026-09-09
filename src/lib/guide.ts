@@ -1,0 +1,217 @@
+// Team-facing usage guide — single source of truth, rendered on /guide and as
+// the "How to use this" expander on each Ploybook card. Plain English (house
+// style): front-load the point, short sentences, no jargon, no invented claims.
+
+export interface PloybookGuide {
+  key: string;
+  title: string;
+  audience: string;
+  whenToUse: string;
+  whatToEnter: string;
+  whatHappens: string;
+  whatYouGet: string;
+  goodExample?: string;
+  caveat?: string;
+}
+
+export const GENERAL_GUIDE = {
+  intro:
+    "Growth OS finds sign work, researches it, and prepares the next step. It never sends an email, publishes a page, or submits a bid on its own — everything external stops in Approvals and waits for a person.",
+  rhythm: [
+    "Every morning the system pulls new Texas construction filings (TDLR) and scores them into Opportunities.",
+    "When someone we can identify visits houstonsigncrafters.com, they land in Opportunities automatically (RB2B).",
+    "Anything waiting on a human shows in Approvals. Treat Approvals as your to-do list.",
+    "Long jobs (research, bid analysis) run in the background for a few minutes. Refresh the page; check Ploybooks → Recent runs for progress.",
+  ],
+  scores:
+    "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't.",
+  approvals:
+    "Approving a draft means 'this is good — I'll send/publish it' or 'I did send it'. Rejecting keeps the research but stops the action. Nothing goes out by itself.",
+};
+
+export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
+  pb00_dummy: {
+    key: "pb00_dummy",
+    title: "Engine smoke test",
+    audience: "Nobody — it's a system check",
+    whenToUse: "Only to check the system is alive. It creates throwaway test records.",
+    whatToEnter: "Nothing.",
+    whatHappens: "A fake account and opportunity are created, then it asks for one approval.",
+    whatYouGet: "Proof the engine works. Safe to ignore day to day.",
+  },
+  pb01_gc_pursuit: {
+    key: "pb01_gc_pursuit",
+    title: "Go after a general contractor",
+    audience: "Rameel, sales",
+    whenToUse:
+      "A GC is bidding a project that includes signs or awnings, or you want HSC on a GC's bid list. Also the 'Pursue' button on most TDLR opportunities runs this.",
+    whatToEnter: "The GC's company name. Example: Harvey Cleary.",
+    whatHappens:
+      "It researches the company live on the web (about 5 minutes), finds the right people, checks what they require from vendors, scores the fit, and writes a short intro email.",
+    whatYouGet:
+      "An approval card with the research, the people found, what's missing, and the email draft. Approve it when you're ready to send the email yourself.",
+    goodExample: "TDLR shows a $10M Houston project → Pursue → review the draft in Approvals.",
+    caveat: "Names found by research are unverified until checked in Apollo or LinkedIn. Never email a guessed address.",
+  },
+  pb02_commercial_development: {
+    key: "pb02_commercial_development",
+    title: "Map a new development",
+    audience: "Rameel, sales",
+    whenToUse:
+      "A shopping center, mixed-use, or retail development is announced or under construction and it will need monument, directional, and tenant signage.",
+    whatToEnter: "The development's name. Example: Manvel Town Center.",
+    whatHappens:
+      "It researches who's behind it (developer, GC, architect, property manager) and which tenants are announced, then creates a separate opportunity for each confirmed tenant.",
+    whatYouGet:
+      "A map of the players, tenant opportunities in the inbox, and a recommendation for who to approach first (usually the developer for the site package).",
+    caveat: "Revenue estimates are labeled ASSUMPTION. They are for prioritizing, not for quoting.",
+  },
+  pb03_franchise_expansion: {
+    key: "pb03_franchise_expansion",
+    title: "Chase a franchise rollout",
+    audience: "Rameel, sales",
+    whenToUse: "A brand is opening multiple Texas locations — new market entry, development agreement, or an existing customer expanding.",
+    whatToEnter: "The brand name. Example: OAKBERRY.",
+    whatHappens:
+      "It researches the Texas footprint, announced openings, and who actually buys the buildouts (franchisor, franchisee groups, or their GCs).",
+    whatYouGet:
+      "Each confirmed opening as an opportunity, a strategic score for the brand, and a recommendation on the buying path — who to contact and with what offer.",
+  },
+  pb04_facility_portfolio: {
+    key: "pb04_facility_portfolio",
+    title: "Win a multi-location operator",
+    audience: "Rameel, sales",
+    whenToUse:
+      "One company operates many locations (clinics, gyms, gas stations, restaurants) and could give us repeat signage and service work.",
+    whatToEnter: "The operator's name. Example: HCA Houston Healthcare.",
+    whatHappens:
+      "It researches their locations and facilities/construction people, checks for expansion or rebrand activity, and looks for an existing sign vendor.",
+    whatYouGet:
+      "A portfolio opportunity with contacts and a pitch recommendation. If they already have a sign vendor, it recommends the overflow/service angle — never 'replace your vendor'.",
+  },
+  pb05_opportunity_radar: {
+    key: "pb05_opportunity_radar",
+    title: "Turn any signal into an opportunity",
+    audience: "Everyone",
+    whenToUse:
+      "You saw something — a bid notice, a news article, a permit, a PlanHub invite, an email. Paste it and let the system decide if it matters. TDLR filings run through this automatically every morning.",
+    whatToEnter: "The raw text of whatever you saw. More text is better than a summary.",
+    whatHappens: "It identifies the company and project, checks it's not already in the system, scores it, and says why it matters.",
+    whatYouGet: "A scored card in Opportunities with a recommended next step. Duplicates are caught automatically.",
+  },
+  pb06_company_swarm: {
+    key: "pb06_company_swarm",
+    title: "Multi-contact push on one account",
+    audience: "Rameel, sales",
+    whenToUse:
+      "One relationship isn't enough — a strategic account where you want 3–5 people hearing from us over a week or two.",
+    whatToEnter: "The account name. If we have no contacts yet, it researches and finds some first.",
+    whatHappens:
+      "It picks the most influential people, gives each a different angle and a different day, and writes each a different message. Identical messages are blocked by the system.",
+    whatYouGet: "One approval card with the whole sequence — people, timing, and every draft. Approve the plan, then send the messages yourself on the scheduled days.",
+  },
+  pb07_abm_page: {
+    key: "pb07_abm_page",
+    title: "Private page for one account",
+    audience: "Rameel, sales",
+    whenToUse:
+      "You want to send a prospect a page made just for them — our relevant capabilities and proof, in their language — instead of a generic brochure.",
+    whatToEnter: "The account name.",
+    whatHappens: "It builds the page from our real research on them. Proof slots are placeholders until you attach real portfolio projects.",
+    whatYouGet:
+      "A draft page. Approve to publish at a private link (unguessable, hidden from Google). Every time they open it, the visit is logged on the account.",
+    caveat: "Attach real project photos before sending. Never send with placeholder proof.",
+  },
+  pb08_high_intent_visitor: {
+    key: "pb08_high_intent_visitor",
+    title: "Website visitor → lead",
+    audience: "Automatic (RB2B)",
+    whenToUse:
+      "Runs by itself when RB2B identifies a visitor on our site. Run it manually only to test.",
+    whatToEnter: "Nothing normally. Manual runs take a company name.",
+    whatHappens:
+      "It scores what they looked at — pricing, monument signs, awnings, and proposal pages score high; blog and careers score zero. Repeat visits add points.",
+    whatYouGet:
+      "High scorers become opportunities with the identified person saved as a contact and a recommended next move. Low scorers are just logged.",
+  },
+  pb09_account_research: {
+    key: "pb09_account_research",
+    title: "Research brief on any company",
+    audience: "Everyone",
+    whenToUse: "You're about to call, meet, or quote someone and want the full picture in one place.",
+    whatToEnter: "The company name.",
+    whatHappens: "Live web research (about 5 minutes): what they do, size, Houston presence, projects, people, signals.",
+    whatYouGet:
+      "A structured brief saved on the account. Facts are labeled verified, inferred, or assumed — trust them in that order.",
+  },
+  pb10_incoming_bid: {
+    key: "pb10_incoming_bid",
+    title: "Log an incoming bid invite",
+    audience: "Jamal",
+    whenToUse: "A bid invitation arrives — PlanHub, email, or a phone call you turn into notes.",
+    whatToEnter: "Paste the whole invitation text (the email body or PlanHub invite).",
+    whatHappens:
+      "It extracts the GC, project, due date, and how to submit, creates a tracked bid with an internal deadline two days early, and recommends BID, REVIEW, or PASS.",
+    whatYouGet:
+      "An approval card with the recommendation. Approve = we're bidding it (Jamal is assigned). Reject = pass, recorded so we remember why.",
+    goodExample: "Forwarded C.A. Walker email → paste → REVIEW recommendation → approve → analysis queued.",
+  },
+  pb11_bid_analyzer: {
+    key: "pb11_bid_analyzer",
+    title: "Analyze a bid package",
+    audience: "Jamal",
+    whenToUse: "You've downloaded the drawings, specs, and addenda for a bid and want the estimator brief before doing the takeoff.",
+    whatToEnter: "The folder path where the files live.",
+    whatHappens:
+      "It reads every document (a few minutes), finds the signage/awning/canopy sheets and specs, splits scope into built-in-house vs bought-from-suppliers, flags risks, and drafts supplier price requests immediately — because waiting on supplier pricing is our slowest step.",
+    whatYouGet:
+      "The estimator brief (scope, sheet references, risks, RFIs, exclusions) plus supplier RFQ drafts in Approvals — send those day 1, then do the takeoff.",
+    caveat:
+      "It never invents quantities — measuring stays your job. Current limitation: it reads files on the computer running the system; a file-upload button is on the roadmap, so for now hand packages to Rameel to run.",
+  },
+  pb12_bid_qa: {
+    key: "pb12_bid_qa",
+    title: "Pre-submission checklist",
+    audience: "Jamal",
+    whenToUse: "The bid is priced and you're about to submit. Run this first — it catches the boring mistakes that lose bids.",
+    whatToEnter: "The bid's ID (shown on the PB10 run and the approval card).",
+    whatHappens:
+      "It checks 16 items — addenda acknowledged, supplier quotes received, W-9, COI, signature, the deadline hasn't passed — and says READY or NOT READY with the blockers.",
+    whatYouGet:
+      "A checklist card in Approvals. Submit the bid yourself (portal or email), then approve the card to record it. That starts the follow-up plan automatically.",
+  },
+  pb13_bid_followup: {
+    key: "pb13_bid_followup",
+    title: "Bid follow-up (automatic)",
+    audience: "Jamal, sales",
+    whenToUse:
+      "You don't run this — it starts by itself when a bid is recorded as submitted. Day 2, 7, 14, and 30 follow-ups are scheduled automatically.",
+    whatToEnter: "Nothing normally. Manual runs take a bid ID.",
+    whatHappens:
+      "When a follow-up comes due, a short drafted email appears in Approvals. The day-30 one asks about the award — and if we lost, who won. Once the bid is marked won or lost, remaining follow-ups cancel themselves.",
+    whatYouGet: "No bid ever goes silent. Approve each draft after you send it.",
+  },
+  pb14_deal_room: {
+    key: "pb14_deal_room",
+    title: "Trackable proposal page",
+    audience: "Rameel, sales",
+    whenToUse:
+      "Instead of emailing a static proposal PDF, give the customer a private page — and know when they read it.",
+    whatToEnter: "The opportunity's ID (from its card or run).",
+    whatHappens:
+      "It drafts the page from our real research: scope, process timeline, warranty, exclusions, FAQs. Pricing stays blank until a person enters it — the system never prices anything.",
+    whatYouGet:
+      "Approve to publish at a private link. Every view is logged, and 3+ views in 24 hours raises a 'call them now' alert.",
+  },
+  pb15_business_case: {
+    key: "pb15_business_case",
+    title: "Help a champion sell us internally",
+    audience: "Rameel",
+    whenToUse:
+      "A big deal is stuck because your contact has to convince their own bosses. Give them the document that does it.",
+    whatToEnter: "The opportunity's ID.",
+    whatHappens:
+      "It drafts the internal case: current state, proposed model, benefits, an implementation plan — with confirmed facts strictly separated from assumptions, and every dollar figure labeled ASSUMPTION.",
+    whatYouGet: "A draft saved on the opportunity. Review it, fill the gaps it lists, and send it to your champion.",
+  },
+};

@@ -5,6 +5,7 @@ import { listPloybooks } from "@/lib/ploybooks/registry";
 import { ploybookRuns } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import { launchPloybookAction, retryRunAction, resumeRunAction } from "@/app/actions";
+import { PLOYBOOK_GUIDES } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
 
@@ -46,29 +47,53 @@ export default async function PloybooksPage() {
       <h1 className="text-xl font-semibold">Ploybooks</h1>
 
       <section className="grid grid-cols-2 gap-4">
-        {defs.map((def) => (
-          <div key={def.key} className="rounded-lg border border-fog bg-white p-4">
-            <div className="text-sm font-semibold">{def.name}</div>
-            <p className="mt-1 text-xs text-steel">{def.description}</p>
-            <div className="mt-2 text-xs text-steel/70">
-              {def.steps.length} steps · v{def.version}
-            </div>
-            <form action={launchPloybookAction} className="mt-3 flex gap-2">
-              <input type="hidden" name="ploybookKey" value={def.key} />
-              {inputPlaceholders[def.key] && (
-                <input
-                  name="input"
-                  required
-                  placeholder={inputPlaceholders[def.key]}
-                  className="flex-1 rounded border border-fog px-2 py-1 text-xs"
-                />
+        {defs.map((def) => {
+          const guide = PLOYBOOK_GUIDES[def.key];
+          return (
+            <div key={def.key} className="rounded-lg border border-fog bg-white p-4">
+              <div className="text-sm font-semibold">{def.name}</div>
+              {guide ? (
+                <p className="mt-1 text-xs text-steel">{guide.whenToUse}</p>
+              ) : (
+                <p className="mt-1 text-xs text-steel">{def.description}</p>
               )}
-              <button className="rounded bg-signal hover:bg-signal-600 px-3 py-1.5 text-xs font-medium text-white">
-                Run now
-              </button>
-            </form>
-          </div>
-        ))}
+              {guide && (
+                <details className="mt-2 rounded bg-cloud px-2.5 py-1.5 text-xs">
+                  <summary className="cursor-pointer select-none font-medium text-ink-700">
+                    How to use this
+                  </summary>
+                  <div className="mt-2 space-y-1.5 text-steel">
+                    <p>
+                      <span className="font-medium text-ink-700">Enter:</span> {guide.whatToEnter}
+                    </p>
+                    <p>
+                      <span className="font-medium text-ink-700">What happens:</span>{" "}
+                      {guide.whatHappens}
+                    </p>
+                    <p>
+                      <span className="font-medium text-ink-700">You get:</span> {guide.whatYouGet}
+                    </p>
+                    {guide.caveat && <p className="text-amber-900">{guide.caveat}</p>}
+                  </div>
+                </details>
+              )}
+              <form action={launchPloybookAction} className="mt-3 flex gap-2">
+                <input type="hidden" name="ploybookKey" value={def.key} />
+                {inputPlaceholders[def.key] && (
+                  <input
+                    name="input"
+                    required
+                    placeholder={inputPlaceholders[def.key]}
+                    className="flex-1 rounded border border-fog px-2 py-1 text-xs"
+                  />
+                )}
+                <button className="rounded bg-signal hover:bg-signal-600 px-3 py-1.5 text-xs font-medium text-white">
+                  Run now
+                </button>
+              </form>
+            </div>
+          );
+        })}
       </section>
 
       <section>
