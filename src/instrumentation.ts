@@ -8,9 +8,41 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.ENABLE_SCHEDULER !== "true") return;
 
+  // Boot sweep: a fresh process means every "running" run died with the old one
+  // (deploys restart the server mid-research otherwise silently stranding runs).
+  const bootSweep = async () => {
+    try {
+      const { getDb } = await import("@/lib/db/client");
+      const db = await getDb();
+      const { resumeOrphanedRuns } = await import("@/lib/ploybooks/runner");
+      await import("@/lib/ploybooks");
+      const resumed = await resumeOrphanedRuns(db, {
+        runningOlderThanMs: 0,
+        queuedOlderThanMs: 2 * 60 * 1000,
+      });
+      if (resumed) console.log(`[scheduler] auto-resumed ${resumed} orphaned run(s) after boot`);
+    } catch (err) {
+      console.error("[scheduler] boot sweep failed:", err);
+    }
+  };
+
   const tick = async () => {
     const { getDb } = await import("@/lib/db/client");
     const db = await getDb();
+
+    // Steady-state orphan pickup: queued runs nobody executed (e.g. PB10's child
+    // analysis), and running runs stale for 30+ min (crashed handler).
+    try {
+      const { resumeOrphanedRuns } = await import("@/lib/ploybooks/runner");
+      await import("@/lib/ploybooks");
+      const resumed = await resumeOrphanedRuns(db, {
+        runningOlderThanMs: 30 * 60 * 1000,
+        queuedOlderThanMs: 2 * 60 * 1000,
+      });
+      if (resumed) console.log(`[scheduler] auto-resumed ${resumed} orphaned run(s)`);
+    } catch (err) {
+      console.error("[scheduler] orphan pickup failed:", err);
+    }
 
     // §20 event subscriptions (e.g. bid.submitted → PB13 follow-up plan)
     try {
@@ -45,6 +77,6 @@ export async function register() {
   };
 
   setInterval(tick, 15 * 60 * 1000);
-  void tick();
-  console.log("[scheduler] enabled (events, follow-ups, TDLR daily pull)");
+  void bootSweep().then(() => tick());
+  console.log("[scheduler] enabled (orphan resume, events, follow-ups, TDLR daily pull)");
 }

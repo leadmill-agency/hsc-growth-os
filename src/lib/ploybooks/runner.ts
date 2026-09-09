@@ -293,6 +293,46 @@ export async function resolveApproval(
   return decision;
 }
 
+/**
+ * Resume runs orphaned by a server restart/redeploy (§23: resumable, no lost work).
+ * - status "running": in-flight work died with the old process. On a fresh boot
+ *   (olderThanMs 0) every one of them is orphaned; during steady state use a
+ *   generous threshold so a legitimately slow step isn't double-executed.
+ * - status "queued": launched but never picked up (e.g. PB10's child analysis).
+ * Single-replica assumption (Railway): only one process executes runs.
+ */
+export async function resumeOrphanedRuns(
+  db: Db,
+  opts: { runningOlderThanMs: number; queuedOlderThanMs: number; limit?: number }
+): Promise<number> {
+  const now = Date.now();
+  const candidates = await db.query.ploybookRuns.findMany({
+    where: (runs, { inArray }) => inArray(runs.status, ["running", "queued"]),
+    limit: 50,
+  });
+  let resumed = 0;
+  for (const run of candidates) {
+    if (resumed >= (opts.limit ?? 5)) break;
+    const age = now - run.updatedAt.getTime();
+    const threshold = run.status === "running" ? opts.runningOlderThanMs : opts.queuedOlderThanMs;
+    if (age < threshold) continue;
+    await logActivity(db, {
+      entityType: "ploybook_run",
+      entityId: run.id,
+      action: "run.auto_resumed",
+      detail: `Orphaned ${run.status} run picked up (${Math.round(age / 60000)} min old)`,
+      ploybookRunId: run.id,
+    });
+    try {
+      await executeRun(db, run.id);
+    } catch (err) {
+      console.error(`[runner] auto-resume failed for ${run.id}:`, err);
+    }
+    resumed++;
+  }
+  return resumed;
+}
+
 /** Reset a failed run's failed step to pending and re-execute (visible retry, §23). */
 export async function retryRun(db: Db, runId: string): Promise<string> {
   await db

@@ -12,7 +12,7 @@ import {
   accounts,
   opportunities,
 } from "@/lib/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { createAccount } from "@/lib/actions/entities";
 import type { PloybookDefinition } from "@/lib/ploybooks/types";
 
@@ -135,6 +135,38 @@ describe("ploybook engine", () => {
       orderBy: asc(ploybookSteps.stepOrder),
     });
     expect((steps[2].outputs as Record<string, unknown>).decision).toBe("rejected");
+  });
+
+  it("auto-resumes runs orphaned by a restart (running mid-step, and stale queued)", async () => {
+    const { resumeOrphanedRuns } = await import("./runner");
+    // Simulate a run whose in-flight step died with the old process
+    const orphanId = await launchRun(db, { ploybookKey: "pb00_dummy" });
+    await db
+      .update(ploybookRuns)
+      .set({ status: "running", updatedAt: new Date(Date.now() - 60_000) })
+      .where(eq(ploybookRuns.id, orphanId));
+    await db
+      .update(ploybookSteps)
+      .set({ status: "running" })
+      .where(and(eq(ploybookSteps.runId, orphanId), eq(ploybookSteps.stepKey, "create_entities")));
+    // Simulate a queued run nobody picked up
+    const queuedId = await launchRun(db, { ploybookKey: "pb00_dummy" });
+    await db
+      .update(ploybookRuns)
+      .set({ updatedAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(ploybookRuns.id, queuedId));
+
+    const resumed = await resumeOrphanedRuns(db, { runningOlderThanMs: 0, queuedOlderThanMs: 2 * 60_000 });
+    expect(resumed).toBe(2);
+    const orphan = await db.query.ploybookRuns.findFirst({ where: eq(ploybookRuns.id, orphanId) });
+    expect(orphan?.status).toBe("waiting_for_approval"); // ran through to the gate
+    const picked = await db.query.ploybookRuns.findFirst({ where: eq(ploybookRuns.id, queuedId) });
+    expect(picked?.status).toBe("waiting_for_approval");
+
+    // A freshly-updated running run is NOT touched at steady-state thresholds
+    const freshId = await launchRun(db, { ploybookKey: "pb00_dummy" });
+    await db.update(ploybookRuns).set({ status: "running" }).where(eq(ploybookRuns.id, freshId));
+    expect(await resumeOrphanedRuns(db, { runningOlderThanMs: 30 * 60_000, queuedOlderThanMs: 2 * 60_000 })).toBe(0);
   });
 
   it("marks a failing step failed, preserves prior work, and retries cleanly", async () => {
