@@ -18,7 +18,8 @@ const signalParseSchema = z.object({
   project_name: z.string().nullable(),
   city: z.string().nullable(),
   trade_relevance: z.enum(["explicit_signage", "likely_signage", "adjacent", "irrelevant"]),
-  opportunity_type: z.string(),
+  opportunity_type: z.string().max(60), // short label, not a sentence
+  estimated_construction_value_usd: z.number().nullable(), // only when the signal states it
   estimated_relevance_score: z.number().min(0).max(100),
   why_this_matters: z.string(),
   suggested_ploybook: z.enum(["pb01_gc_pursuit", "pb02", "pb03", "pb04", "none"]),
@@ -44,7 +45,10 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           system:
             "You classify raw commercial-construction signals for Houston Sign Crafters " +
             "(signs/awnings, Houston TX). Extract only what the signal actually says; everything " +
-            "else goes in unknowns. trade_relevance is explicit_signage only when signage/awning " +
+            "else goes in unknowns. opportunity_type is a SHORT label (2-4 words, e.g. 'new " +
+            "construction', 'commercial remodel') — never a sentence. " +
+            "estimated_construction_value_usd only when the signal states a dollar figure. " +
+            "trade_relevance is explicit_signage only when signage/awning " +
             "scope is stated. estimated_relevance_score is on a 0-100 scale (NOT 0-10): 85-100 " +
             "pursue now (Houston + explicit signage + active bid), 70-84 strong, 50-69 monitor, " +
             "<50 weak. suggested_ploybook: pb01_gc_pursuit for GC/bid signals; none if irrelevant.",
@@ -119,7 +123,12 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         });
         return {
           kind: "completed",
-          outputs: { opportunityId: opportunity.id, accountId: account?.id ?? null, deduped: false },
+          outputs: {
+            opportunityId: opportunity.id,
+            accountId: account?.id ?? null,
+            projectId: project?.id ?? null,
+            deduped: false,
+          },
         };
       },
     },
@@ -133,6 +142,18 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         }
         const parsed = ctx.priorOutputs["parse_signal"].parsed as z.infer<typeof signalParseSchema>;
         const opportunityId = resolved.opportunityId as string;
+        // A stated construction value belongs to the PROJECT — never presented as
+        // the signage opportunity's value.
+        if (parsed.estimated_construction_value_usd != null && resolved.projectId) {
+          const { projects } = await import("@/lib/db/schema");
+          await ctx.db
+            .update(projects)
+            .set({
+              estimatedProjectValue: String(parsed.estimated_construction_value_usd),
+              updatedAt: new Date(),
+            })
+            .where(eq(projects.id, resolved.projectId as string));
+        }
         await ctx.db
           .update(opportunities)
           .set({
@@ -145,6 +166,14 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             updatedAt: new Date(),
           })
           .where(eq(opportunities.id, opportunityId));
+        await saveEvidence(ctx.db, {
+          entityType: "opportunity",
+          entityId: opportunityId,
+          fieldName: "why_this_matters",
+          value: parsed.why_this_matters,
+          sourceName: "pb05_radar",
+          verificationStatus: "inferred",
+        });
         await logActivity(ctx.db, {
           entityType: "opportunity",
           entityId: opportunityId,

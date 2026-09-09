@@ -14,6 +14,7 @@ export const harveySignalParse = {
   city: "Houston",
   trade_relevance: "explicit_signage",
   opportunity_type: "gc_bid",
+  estimated_construction_value_usd: null,
   estimated_relevance_score: 84,
   why_this_matters:
     "Named GC actively bidding a Houston institutional project with explicit signage/wayfinding scope and a known due date.",
