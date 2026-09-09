@@ -9,6 +9,9 @@ import { pb06CompanySwarm } from "./pb06-company-swarm/definition";
 import { pb07AbmPage } from "./pb07-abm-page/definition";
 import { pb08HighIntentVisitor } from "./pb08-high-intent-visitor/definition";
 import { pb09AccountResearch } from "./pb09-account-research/definition";
+import { pb10IncomingBid } from "./pb10-incoming-bid/definition";
+import { pb11BidAnalyzer } from "./pb11-bid-analyzer/definition";
+import { pb12BidQa } from "./pb12-bid-qa/definition";
 
 // Register all ploybooks. Import this module once (server startup / test setup)
 // before using the runner. Remaining PBs register here as they are built.
@@ -23,6 +26,9 @@ registerPloybook(pb06CompanySwarm);
 registerPloybook(pb07AbmPage);
 registerPloybook(pb08HighIntentVisitor);
 registerPloybook(pb09AccountResearch);
+registerPloybook(pb10IncomingBid);
+registerPloybook(pb11BidAnalyzer);
+registerPloybook(pb12BidQa);
 
 export * from "./types";
 export * from "./registry";

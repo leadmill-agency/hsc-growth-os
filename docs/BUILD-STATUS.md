@@ -32,9 +32,9 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | PB06 | Company Swarm | B | 3 | **MVP done 2026-09-07** | 4-contact GC fixture | plan→distinct drafts (similarity-validated in code, fails visibly on dupes)→ONE swarm approval |
 | PB07 | ABM Account Page | B | 3 | **MVP done 2026-09-07** | Harvey Cleary (live) | private noindex page at /p/[token], publish behind approval, per-view tracking (interaction + event); proof points placeholder until real portfolio seeded; verified live |
 | PB08 | High-Intent Visitor | C | 3 | **MVP done 2026-09-07** | deterministic page-intent fixture | /api/visitor intake (token-guarded) ready for RB2B webhook; RB2B script installed on website repo (commit 40c5e2e, needs push+deploy) |
-| PB10 | Incoming Bid | A | 4 | todo | historical HSC bid pkg (ask #2) | — |
-| PB11 | Bid Package Analyzer | A | 4 | todo | same bid pkg; Jamal validates | — |
-| PB12 | Bid QA + Submission | C | 4 | todo | — | — |
+| PB10 | Incoming Bid | A | 4 | **MVP done 2026-09-09** | real RTG/C.A. Walker invite | parse→tracked bid w/ internal due buffer→BID/REVIEW/PASS gate→assigns Jamal→queues PB11 |
+| PB11 | Bid Package Analyzer | A | 4 | **MVP done 2026-09-09 — LIVE-verified on real RTG package** | RTG Baytown (190 docs) + Saratoga (Planhub folder w/ HSC's own takeoff = answer key, ungraded yet) | ingestion (§19: originals untouched, quality-flagged), relevance selection matched human sheet-pull, scope split in-house vs supplier-fab, day-1 supplier RFQs behind approval (Jamal's #1 bottleneck). **Awaiting Jamal's grading of docs/demos/2026-09-09-rtg-estimator-brief.md** |
+| PB12 | Bid QA + Submission | C | 4 | **MVP done 2026-09-09** | seeded bid | deterministic checklist incl. supplier quotes + computed deadline check; READY/NOT READY; human submits; bid.submitted event feeds PB13 |
 | PB13 | Bid Follow-Up / Award Watch | A | 5 | todo | — | — |
 | PB14 | Proposal Deal Room | A | 5 | todo | real proposal (ask #2) | — |
 | PB15 | Business Case / Deal Progression | C | 5 | todo | — | — |

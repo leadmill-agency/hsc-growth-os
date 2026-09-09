@@ -18,6 +18,9 @@ const inputPlaceholders: Record<string, string> = {
   pb07_abm_page: "Account name",
   pb08_high_intent_visitor: "Company name (visitor)",
   pb09_account_research: "Account name",
+  pb10_incoming_bid: "Paste the bid invitation text…",
+  pb11_bid_analyzer: "Absolute path to the bid documents folder",
+  pb12_bid_qa: "Bid ID (from the PB10 run outputs)",
 };
 
 const statusColor: Record<string, string> = {

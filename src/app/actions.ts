@@ -27,6 +27,9 @@ const inputFieldByPloybook: Record<string, string> = {
   pb07_abm_page: "accountName",
   pb08_high_intent_visitor: "companyName",
   pb09_account_research: "accountName",
+  pb10_incoming_bid: "inviteText",
+  pb11_bid_analyzer: "folderPath",
+  pb12_bid_qa: "bidId",
 };
 
 export async function launchPloybookAction(formData: FormData) {
