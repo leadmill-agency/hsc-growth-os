@@ -37,11 +37,52 @@ export const pb01GcPursuit: PloybookDefinition = {
           tradeScope?: string;
           sourceUrl?: string;
           opportunityId?: string;
+          identifyOwner?: boolean;
         };
-        if (!p.gcName) throw new Error("gcName is required");
+        let gcName = p.gcName;
+        let accountType = "general_contractor";
+        // Ownerless permit signals (e.g. TDLR): research who is behind the project
+        // first. If research can't establish a company, fail visibly — we never
+        // fabricate an owner (§5.4).
+        if (!gcName && p.identifyOwner && p.projectName) {
+          const { getResearchProvider } = await import("@/lib/integrations/research/provider");
+          const { getLLMClient } = await import("@/lib/ai/client");
+          const provider = await getResearchProvider();
+          const research = await provider.research({
+            query:
+              `Who is the owner, developer, or general contractor behind the commercial ` +
+              `construction project "${p.projectName}"${p.city ? ` in ${p.city}, TX` : " in Texas"}? ` +
+              `Look for permit records, news, leasing pages, and contractor announcements.`,
+            focus: "identifying the company to contact about signage for this project",
+          });
+          const { z } = await import("zod");
+          const identified = await getLLMClient().generateStructured({
+            system:
+              "Identify the company behind a construction project from research text. Use ONLY " +
+              "the research. status: verified (explicitly stated with source), inferred " +
+              "(strongly implied), or unknown (research did not establish it — set company_name " +
+              "null). Never guess a company from name similarity.",
+            prompt: `RESEARCH:\n${research.text}\n\nSOURCES:\n${research.sources.map((s) => s.url).join("\n")}\n\nWho is behind "${p.projectName}"?`,
+            schema: z.object({
+              company_name: z.string().nullable(),
+              company_role: z.enum(["general_contractor", "developer", "property_owner", "unknown"]),
+              status: z.enum(["verified", "inferred", "unknown"]),
+              source_note: z.string().nullable(),
+            }),
+            effort: "low",
+          });
+          if (!identified.company_name || identified.status === "unknown") {
+            throw new Error(
+              `Could not identify the owner/GC behind "${p.projectName}" — needs manual research before pursuing`
+            );
+          }
+          gcName = identified.company_name;
+          accountType = identified.company_role === "unknown" ? "prospect" : identified.company_role;
+        }
+        if (!gcName) throw new Error("gcName is required");
         const { account } = await createAccount(ctx.db, {
-          name: p.gcName,
-          accountType: "general_contractor",
+          name: gcName,
+          accountType,
           website: p.website,
           ploybookRunId: ctx.runId,
         });
@@ -55,16 +96,36 @@ export const pb01GcPursuit: PloybookDefinition = {
           sourceUrl: p.sourceUrl,
           ploybookRunId: ctx.runId,
         });
-        const { opportunity } = await createOpportunity(ctx.db, {
-          name: `${account.name} — ${project.name}`,
-          accountId: account.id,
-          projectId: project.id,
-          opportunityType: "gc_pursuit",
-          tradeScope: p.tradeScope ?? "signage",
-          stage: "researching",
-          source: "pb01",
-          ploybookRunId: ctx.runId,
-        });
+        // Pursuing an existing inbox card adopts that opportunity (fills in the
+        // resolved account) instead of creating a parallel record.
+        let opportunity;
+        if (p.opportunityId) {
+          const [adopted] = await ctx.db
+            .update(opportunities)
+            .set({
+              accountId: account.id,
+              name: `${account.name} — ${project.name}`,
+              stage: "researching",
+              updatedAt: new Date(),
+            })
+            .where(eq(opportunities.id, p.opportunityId))
+            .returning();
+          opportunity = adopted;
+        }
+        if (!opportunity) {
+          opportunity = (
+            await createOpportunity(ctx.db, {
+              name: `${account.name} — ${project.name}`,
+              accountId: account.id,
+              projectId: project.id,
+              opportunityType: "gc_pursuit",
+              tradeScope: p.tradeScope ?? "signage",
+              stage: "researching",
+              source: "pb01",
+              ploybookRunId: ctx.runId,
+            })
+          ).opportunity;
+        }
         if (p.sourceUrl) {
           await saveEvidence(ctx.db, {
             entityType: "opportunity",

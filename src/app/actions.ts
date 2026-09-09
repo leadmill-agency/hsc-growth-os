@@ -104,18 +104,24 @@ export async function pursueOpportunityAction(formData: FormData) {
   const opp = await db.query.opportunities.findFirst({
     where: eq(opportunities.id, opportunityId),
   });
-  if (!opp?.accountId) return;
-  const account = await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) });
+  if (!opp) return;
+  const account = opp.accountId
+    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
+    : null;
   const project = opp.projectId
     ? await db.query.projects.findFirst({ where: eq(projects.id, opp.projectId) })
     : null;
-  if (!account) return;
+  if (!account && !project) return; // nothing to anchor a pursuit on
+
   const runId = await launchRun(db, {
     ploybookKey: "pb01_gc_pursuit",
     triggerType: "manual",
     triggerPayload: {
-      gcName: account.name,
-      website: account.website ?? undefined,
+      // Owner unknown → PB01's identify-owner step researches who's behind the
+      // project first, then continues (fails visibly if research can't establish it).
+      gcName: account?.name,
+      identifyOwner: !account,
+      website: account?.website ?? undefined,
       projectName: project?.name,
       city: project?.city ?? undefined,
       tradeScope: opp.tradeScope ?? undefined,
@@ -125,6 +131,12 @@ export async function pursueOpportunityAction(formData: FormData) {
     primaryEntityId: opp.id,
     initiatedBy: "user",
   });
+  // Immediate feedback: the card leaves "discovered" right away, which also
+  // prevents a double-click from launching two pursuits.
+  await db
+    .update(opportunities)
+    .set({ stage: "researching", nextAction: "Research running (~5 min)", updatedAt: new Date() })
+    .where(eq(opportunities.id, opp.id));
   executeInBackground(db, runId);
   revalidatePath("/opportunities");
   revalidatePath("/ploybooks");

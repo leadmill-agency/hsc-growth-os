@@ -158,6 +158,66 @@ describe("Harvey Golden Path", () => {
     expect(await db.select().from(accounts)).toHaveLength(0); // nothing fabricated
   });
 
+  it("Pursue on an owner-unknown card identifies the owner first and adopts the existing opportunity", async () => {
+    setLLMClientForTests(
+      new FixtureLLMClient({
+        structured: (prompt: string) => {
+          if (prompt.includes("SIGNAL:"))
+            return { ...harveySignalParse, company_name: null, company_type: "unknown", project_name: "Willowbrook Court" };
+          if (prompt.includes("Who is behind"))
+            return { company_name: "Willowbrook Owner LLC", company_role: "property_owner", status: "inferred", source_note: "permit record" };
+          if (prompt.includes("account research brief")) return harveyBrief;
+          if (prompt.includes("Build the stakeholder map")) return harveyStakeholderPlan;
+          if (prompt.includes("Draft the bid-access email")) return harveyOutreachDraft;
+          throw new Error(`No fixture for prompt: ${prompt.slice(0, 60)}`);
+        },
+      })
+    );
+    // Radar creates the ownerless card
+    const radarRun = await launchRun(db, {
+      ploybookKey: "pb05_opportunity_radar",
+      triggerPayload: { signalText: "TDLR filing: Willowbrook Court renovation", source: "tdlr" },
+    });
+    await executeRun(db, radarRun);
+    const [ownerless] = await db.select().from(opportunities);
+    expect(ownerless.accountId).toBeNull();
+
+    // Pursue → identify owner → continue to the approval gate
+    const runId = await launchRun(db, {
+      ploybookKey: "pb01_gc_pursuit",
+      triggerPayload: {
+        identifyOwner: true,
+        projectName: "Willowbrook Court",
+        city: "Houston",
+        opportunityId: ownerless.id,
+      },
+    });
+    expect(await executeRun(db, runId)).toBe("waiting_for_approval");
+
+    // Same opportunity row adopted (no duplicate), account resolved with the right type
+    const opps = await db.select().from(opportunities);
+    expect(opps).toHaveLength(1);
+    expect(opps[0].id).toBe(ownerless.id);
+    expect(opps[0].accountId).not.toBeNull();
+    const [owner] = await db.select().from(accounts);
+    expect(owner.name).toBe("Willowbrook Owner LLC");
+    expect(owner.accountType).toBe("property_owner");
+  });
+
+  it("fails visibly when owner identification can't establish a company", async () => {
+    setLLMClientForTests(
+      new FixtureLLMClient({
+        structured: () => ({ company_name: null, company_role: "unknown", status: "unknown", source_note: null }),
+      })
+    );
+    const runId = await launchRun(db, {
+      ploybookKey: "pb01_gc_pursuit",
+      triggerPayload: { identifyOwner: true, projectName: "Mystery Project" },
+    });
+    expect(await executeRun(db, runId)).toBe("failed");
+    expect(await db.select().from(accounts)).toHaveLength(0); // nothing fabricated
+  });
+
   it("PB01 records a rejection without losing the research", async () => {
     const runId = await launchRun(db, {
       ploybookKey: "pb01_gc_pursuit",

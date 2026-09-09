@@ -22,6 +22,7 @@ export const GENERAL_GUIDE = {
     "When someone we can identify visits houstonsigncrafters.com, they land in Opportunities automatically (RB2B).",
     "Anything waiting on a human shows in Approvals. Treat Approvals as your to-do list.",
     "Long jobs (research, bid analysis) run in the background for a few minutes. Refresh the page; check Ploybooks → Recent runs for progress.",
+    "Pursue on an opportunity card launches the full pursuit: research, fit score, contacts, and an outreach draft in Approvals (~5 minutes). If the card says 'owner unknown', Pursue first researches who's behind the project — and tells you if it can't find out.",
   ],
   scores:
     "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't.",
