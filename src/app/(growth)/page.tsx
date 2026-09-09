@@ -47,17 +47,17 @@ export default async function Home() {
           { label: "Agents running", value: runningRuns.length + waitingRuns.length },
           { label: "Needs you", value: pendingApprovals.length },
         ].map((kpi) => (
-          <div key={kpi.label} className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div key={kpi.label} className="rounded-lg border border-fog bg-white p-4">
             <div className="text-2xl font-semibold">{kpi.value}</div>
-            <div className="text-xs text-zinc-500">{kpi.label}</div>
+            <div className="text-xs text-steel">{kpi.label}</div>
           </div>
         ))}
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Needs you</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Needs you</h2>
         {pendingApprovals.length === 0 ? (
-          <p className="text-sm text-zinc-500">No pending approvals.</p>
+          <p className="text-sm text-steel">No pending approvals.</p>
         ) : (
           <div className="space-y-2">
             {pendingApprovals.map((a) => (
@@ -67,7 +67,7 @@ export default async function Home() {
               >
                 <div>
                   <div className="text-sm font-medium">{a.title}</div>
-                  {a.summary && <div className="text-xs text-zinc-600">{a.summary}</div>}
+                  {a.summary && <div className="text-xs text-steel">{a.summary}</div>}
                 </div>
                 <div className="flex gap-2">
                   <form action={resolveApprovalAction}>
@@ -80,7 +80,7 @@ export default async function Home() {
                   <form action={resolveApprovalAction}>
                     <input type="hidden" name="approvalId" value={a.id} />
                     <input type="hidden" name="decision" value="rejected" />
-                    <button className="rounded bg-zinc-200 px-3 py-1 text-xs font-medium">
+                    <button className="rounded bg-fog px-3 py-1 text-xs font-medium">
                       Reject
                     </button>
                   </form>
@@ -92,9 +92,9 @@ export default async function Home() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Agents running</h2>
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Agents running</h2>
         {runningRuns.length + waitingRuns.length === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-steel">
             Nothing running. Launch one from <Link href="/ploybooks" className="underline">Ploybooks</Link>.
           </p>
         ) : (
@@ -112,14 +112,14 @@ export default async function Home() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Recent activity</h2>
-        <ul className="space-y-1 text-xs text-zinc-600">
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent activity</h2>
+        <ul className="space-y-1 text-xs text-steel">
           {recentActivity.map((a) => (
             <li key={a.id}>
-              <span className="font-mono text-zinc-400">
+              <span className="font-mono text-steel/70">
                 {a.occurredAt.toISOString().slice(5, 16).replace("T", " ")}
               </span>{" "}
-              <span className="font-medium text-zinc-800">{a.action}</span>
+              <span className="font-medium text-ink">{a.action}</span>
               {a.detail ? ` — ${a.detail}` : ""}
             </li>
           ))}

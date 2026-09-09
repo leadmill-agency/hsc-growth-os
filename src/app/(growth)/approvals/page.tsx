@@ -24,19 +24,19 @@ export default async function ApprovalsPage() {
       <h1 className="text-xl font-semibold">Approvals</h1>
 
       <section className="space-y-3">
-        {pending.length === 0 && <p className="text-sm text-zinc-500">Nothing pending.</p>}
+        {pending.length === 0 && <p className="text-sm text-steel">Nothing pending.</p>}
         {pending.map((a) => (
           <div key={a.id} className="rounded-lg border border-amber-200 bg-white p-4">
-            <div className="text-xs uppercase tracking-wide text-zinc-400">{a.approvalType}</div>
+            <div className="text-xs uppercase tracking-wide text-steel/70">{a.approvalType}</div>
             <div className="mt-1 text-sm font-semibold">{a.title}</div>
-            {a.summary && <p className="mt-1 text-sm text-zinc-600">{a.summary}</p>}
+            {a.summary && <p className="mt-1 text-sm text-steel">{a.summary}</p>}
             {a.proposedAction && (
-              <p className="mt-1 text-sm text-zinc-600">
+              <p className="mt-1 text-sm text-steel">
                 <span className="font-medium">Proposed:</span> {a.proposedAction}
               </p>
             )}
             {Object.keys((a.payload ?? {}) as object).length > 0 && (
-              <pre className="mt-2 overflow-x-auto rounded bg-zinc-50 p-2 text-xs text-zinc-600">
+              <pre className="mt-2 overflow-x-auto rounded bg-cloud p-2 text-xs text-steel">
                 {JSON.stringify(a.payload, null, 2)}
               </pre>
             )}
@@ -51,7 +51,7 @@ export default async function ApprovalsPage() {
               <form action={resolveApprovalAction}>
                 <input type="hidden" name="approvalId" value={a.id} />
                 <input type="hidden" name="decision" value="rejected" />
-                <button className="rounded bg-zinc-200 px-3 py-1.5 text-xs font-medium">
+                <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">
                   Reject
                 </button>
               </form>
@@ -61,8 +61,8 @@ export default async function ApprovalsPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-zinc-700">Recently resolved</h2>
-        <ul className="space-y-1 text-sm text-zinc-600">
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recently resolved</h2>
+        <ul className="space-y-1 text-sm text-steel">
           {resolved.map((a) => (
             <li key={a.id}>
               {a.title} — <span className="font-medium">{a.status}</span>

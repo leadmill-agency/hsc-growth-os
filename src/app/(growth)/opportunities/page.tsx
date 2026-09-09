@@ -18,10 +18,10 @@ export default async function OpportunitiesPage() {
 
       <form
         action={submitSignalAction}
-        className="space-y-2 rounded-lg border border-zinc-200 bg-white p-4"
+        className="space-y-2 rounded-lg border border-fog bg-white p-4"
       >
         <div className="text-sm font-semibold">Add signal (PB05 Opportunity Radar)</div>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-steel">
           Paste a bid notice, permit line, news blurb, PlanHub invite, or forwarded email. The
           radar classifies it, dedupes, scores it, and suggests the next ploybook.
         </p>
@@ -30,22 +30,22 @@ export default async function OpportunitiesPage() {
           required
           rows={3}
           placeholder="e.g. Harvey Cleary soliciting subs for UH Engineering Building, scope includes exterior signage…"
-          className="w-full rounded border border-zinc-300 px-2 py-1 text-sm"
+          className="w-full rounded border border-fog px-2 py-1 text-sm"
         />
         <div className="flex items-center gap-3">
           <input
             name="sourceUrl"
             placeholder="Source URL (optional)"
-            className="flex-1 rounded border border-zinc-300 px-2 py-1 text-sm"
+            className="flex-1 rounded border border-fog px-2 py-1 text-sm"
           />
-          <button className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white">
+          <button className="rounded bg-signal hover:bg-signal-600 px-3 py-1.5 text-sm font-medium text-white">
             Run radar
           </button>
         </div>
       </form>
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-zinc-200 text-xs text-zinc-500">
+          <tr className="border-b border-fog text-xs text-steel">
             <th className="py-2">Name</th>
             <th>Type</th>
             <th>Stage</th>
@@ -58,14 +58,14 @@ export default async function OpportunitiesPage() {
         </thead>
         <tbody>
           {rows.map((o) => (
-            <tr key={o.id} className="border-b border-zinc-100">
+            <tr key={o.id} className="border-b border-cloud">
               <td className="py-2 font-medium">{o.name}</td>
-              <td className="text-zinc-600">{o.opportunityType ?? "—"}</td>
-              <td className="text-zinc-600">{o.stage}</td>
+              <td className="text-steel">{o.opportunityType ?? "—"}</td>
+              <td className="text-steel">{o.stage}</td>
               <td>{o.overallScore ?? o.fitScore ?? "—"}</td>
               <td>{o.estimatedValue ? `$${Number(o.estimatedValue).toLocaleString()}` : "—"}</td>
-              <td className="text-zinc-600">{o.source ?? "—"}</td>
-              <td className="text-zinc-600">{o.nextAction ?? "—"}</td>
+              <td className="text-steel">{o.source ?? "—"}</td>
+              <td className="text-steel">{o.nextAction ?? "—"}</td>
               <td>
                 {o.stage === "discovered" && (
                   <form action={pursueOpportunityAction}>
@@ -81,7 +81,7 @@ export default async function OpportunitiesPage() {
         </tbody>
       </table>
       {rows.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-steel">
           No opportunities yet. They arrive via Ploybooks (PB05 Opportunity Radar) or manual entry.
         </p>
       )}

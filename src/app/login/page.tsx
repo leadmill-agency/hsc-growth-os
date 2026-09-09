@@ -12,11 +12,11 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center">
       <form
         action={loginAction}
-        className="w-80 space-y-4 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm"
+        className="w-80 space-y-4 rounded-xl border border-fog bg-white p-8 shadow-sm"
       >
         <div>
           <div className="text-lg font-bold tracking-tight">HSC Growth OS</div>
-          <div className="text-xs text-zinc-500">Houston Sign Crafters — internal</div>
+          <div className="text-xs text-steel">Houston Sign Crafters — internal</div>
         </div>
         <input
           type="password"
@@ -24,12 +24,12 @@ export default async function LoginPage({
           required
           autoFocus
           placeholder="Team password"
-          className="w-full rounded border border-zinc-300 px-3 py-2 text-sm"
+          className="w-full rounded border border-fog px-3 py-2 text-sm"
         />
         {params.error && (
           <p className="text-xs text-red-600">Wrong password. Try again.</p>
         )}
-        <button className="w-full rounded bg-zinc-900 px-3 py-2 text-sm font-medium text-white">
+        <button className="w-full rounded bg-signal hover:bg-signal-600 px-3 py-2 text-sm font-medium text-white">
           Sign in
         </button>
       </form>
