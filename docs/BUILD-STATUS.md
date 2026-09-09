@@ -7,7 +7,9 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | Item | Status | Notes |
 |---|---|---|
 | DB schema (§9 entities) | **done** | drizzle migration 0000; Supabase PG in prod, PGlite local |
-| Auth (Supabase) | todo | blocked on Supabase account access (ask #1) |
+| Auth | **done 2026-09-09** (team-password gate + HMAC session; per-user Supabase auth is the later upgrade when roles matter) | |
+| Database (Supabase) | **done 2026-09-09** | project `somkkvfrrxjcsdngdpaw` (us-west-2); migrations applied; local dev + prod share it |
+| Hosting (Railway) | **DEPLOYED 2026-09-09** | https://hsc-growth-os-production.up.railway.app — GitHub-linked (auto-deploys main), env vars set; TDLR cron service still todo |
 | Core nav + entity screens | **done** (minimal) | home/accounts/opportunities/ploybooks/runs/approvals; polish in Phase 1 |
 | Evidence model | **done** | `evidence` table + `saveEvidence` action |
 | Ploybook / run / step / approval models | **done** | |
