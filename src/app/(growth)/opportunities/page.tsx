@@ -58,17 +58,49 @@ const sourceLabels: Record<string, string> = {
   radar: "Radar",
 };
 
-export default async function OpportunitiesPage() {
+// Filter chips (per Rameel 2026-09-10): one per signal source.
+const sourceFilters: { key: string; label: string; sources: string[] }[] = [
+  { key: "tdlr", label: "TDLR filings", sources: ["tdlr"] },
+  { key: "coh", label: "New COs", sources: ["coh_co"] },
+  { key: "web", label: "Web scout", sources: ["web_scout"] },
+  { key: "other", label: "Other", sources: [] }, // everything not in the lists above
+];
+const knownSources = sourceFilters.flatMap((f) => f.sources);
+
+export default async function OpportunitiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ source?: string }>;
+}) {
+  const { source: activeFilter } = await searchParams;
   const db = await getDb();
-  const { sql } = await import("drizzle-orm");
+  const { sql, notInArray } = await import("drizzle-orm");
+  const filter = sourceFilters.find((f) => f.key === activeFilter);
+  const where = filter
+    ? filter.sources.length
+      ? inArray(opportunities.source, filter.sources)
+      : notInArray(sql`coalesce(${opportunities.source}, '')`, knownSources)
+    : undefined;
   // Best first (per Rameel): score desc, newest breaks ties.
   const rows = await db.query.opportunities.findMany({
+    where,
     orderBy: [
       desc(sql`coalesce(${opportunities.overallScore}, ${opportunities.fitScore}, -1)`),
       desc(opportunities.createdAt),
     ],
     limit: 100,
   });
+  const sourceCounts = await db
+    .select({ source: opportunities.source, n: sql<number>`count(*)::int` })
+    .from(opportunities)
+    .groupBy(opportunities.source);
+  const countFor = (f: (typeof sourceFilters)[number]) =>
+    sourceCounts
+      .filter((r) =>
+        f.sources.length ? f.sources.includes(r.source ?? "") : !knownSources.includes(r.source ?? "")
+      )
+      .reduce((sum, r) => sum + r.n, 0);
+  const totalCount = sourceCounts.reduce((sum, r) => sum + r.n, 0);
 
   const projectIds = rows.map((r) => r.projectId).filter((id): id is string => !!id);
   const projectRows = projectIds.length
@@ -117,12 +149,31 @@ export default async function OpportunitiesPage() {
 
       <div className="rounded-lg border border-fog bg-cloud px-4 py-3 text-sm text-ink-700">
         <span className="font-semibold">How this works:</span> refreshed automatically every
-        morning (~7am) from TDLR construction filings, Houston certificates of occupancy, and a
-        web scan for franchise expansions, new developments, and multi-location operators —
-        ranked best-first. Scores of 75+ research themselves and their outreach drafts land in
-        Approvals. <span className="font-semibold">Pursue</span> starts that same research
-        (~5 min) on anything below the line; <span className="font-semibold">the drafts never
-        send without you.</span>
+        morning (~7am) from TDLR construction filings (39 counties, ~150 mi around Houston),
+        Houston certificates of occupancy, and a web scan for franchise expansions, new
+        developments, and multi-location operators — ranked best-first. Scores of 75+ research
+        themselves, best-first up to a daily budget (currently 25); their outreach drafts land
+        in Approvals. <span className="font-semibold">Pursue</span> starts that same research
+        (~5 min) on anything the budget didn&apos;t reach;{" "}
+        <span className="font-semibold">the drafts never send without you.</span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <a
+          href="/opportunities"
+          className={`rounded-full border px-3 py-1 font-medium ${!filter ? "border-signal bg-signal text-white" : "border-fog bg-white text-ink-700 hover:border-signal"}`}
+        >
+          All ({totalCount})
+        </a>
+        {sourceFilters.map((f) => (
+          <a
+            key={f.key}
+            href={`/opportunities?source=${f.key}`}
+            className={`rounded-full border px-3 py-1 font-medium ${filter?.key === f.key ? "border-signal bg-signal text-white" : "border-fog bg-white text-ink-700 hover:border-signal"}`}
+          >
+            {f.label} ({countFor(f)})
+          </a>
+        ))}
       </div>
 
       <form

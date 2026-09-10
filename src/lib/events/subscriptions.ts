@@ -20,7 +20,11 @@ const SUBSCRIPTIONS: Record<string, (db: Db, event: EventRow) => Promise<void>> 
       await import("@/lib/actions/pursue");
     if ((payload.score ?? 0) < autoPursueThreshold()) return;
     if ((await autoPursuitsToday(db)) >= autoPursueDailyCap()) {
-      console.log(`[auto-pursue] daily cap reached — skipping ${event.opportunityId}`);
+      // Out of budget today — put the event back so tomorrow's tick retries it
+      // instead of silently dropping a 75+ lead (it kept its Pursue button and
+      // nobody could tell why it was never researched).
+      await db.update(events).set({ processedAt: null }).where(eq(events.id, event.id));
+      console.log(`[auto-pursue] daily cap reached — deferred ${event.opportunityId} to tomorrow`);
       return;
     }
 
