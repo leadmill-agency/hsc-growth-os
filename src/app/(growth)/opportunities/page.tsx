@@ -1,7 +1,12 @@
 import { getDb } from "@/lib/db/client";
 import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { submitSignalAction, pursueOpportunityAction, pullTdlrAction } from "@/app/actions";
+import {
+  submitSignalAction,
+  pursueOpportunityAction,
+  pullTdlrAction,
+  setOpportunityStageAction,
+} from "@/app/actions";
 import { autoPursueDailyCap } from "@/lib/actions/pursue";
 
 export const dynamic = "force-dynamic";
@@ -77,11 +82,16 @@ export default async function OpportunitiesPage({
   const db = await getDb();
   const { sql, notInArray } = await import("drizzle-orm");
   const filter = sourceFilters.find((f) => f.key === activeFilter);
-  const where = filter
+  const { ne } = await import("drizzle-orm");
+  const sourceWhere = filter
     ? filter.sources.length
       ? inArray(opportunities.source, filter.sources)
       : notInArray(sql`coalesce(${opportunities.source}, '')`, knownSources)
     : undefined;
+  // Dismissed cards leave the working list for good; won/lost stay visible.
+  const where = sourceWhere
+    ? and(ne(opportunities.stage, "dismissed"), sourceWhere)
+    : ne(opportunities.stage, "dismissed");
   // Best first (per Rameel): score desc, newest breaks ties.
   const rows = await db.query.opportunities.findMany({
     where,
@@ -298,6 +308,30 @@ export default async function OpportunitiesPage({
                       title={action.help}
                     >
                       {action.label}
+                    </div>
+                  )}
+                  {!["won", "lost", "dismissed"].includes(o.stage) && (
+                    <div className="flex gap-1.5">
+                      <form action={setOpportunityStageAction}>
+                        <input type="hidden" name="opportunityId" value={o.id} />
+                        <input type="hidden" name="stage" value="won" />
+                        <button
+                          className="rounded border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
+                          title="We already won this work — mark it and celebrate"
+                        >
+                          We won this
+                        </button>
+                      </form>
+                      <form action={setOpportunityStageAction}>
+                        <input type="hidden" name="opportunityId" value={o.id} />
+                        <input type="hidden" name="stage" value="dismissed" />
+                        <button
+                          className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
+                          title="Not relevant — remove from the working list"
+                        >
+                          Dismiss
+                        </button>
+                      </form>
                     </div>
                   )}
                 </div>

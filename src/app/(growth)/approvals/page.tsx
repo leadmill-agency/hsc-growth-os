@@ -83,25 +83,50 @@ function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFo
           )}
         </p>
       )}
-      <label className="block cursor-pointer rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
-        <div className="flex items-center gap-2 text-xs font-semibold text-ink-700">
+      {/* Fully editable (per Rameel 2026-09-10): what you see in these fields —
+          edits included — is exactly what sends when you approve. */}
+      <div className="rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
+        <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-700">
           {hasAlternate && (
             <input type="radio" name="draftVersion" value="primary" defaultChecked form={approveFormId} />
           )}
           {hasAlternate ? "Version A" : "The email"}
-        </div>
-        <div className="mt-1.5 text-sm font-medium">{draft.subject}</div>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{draft.body}</p>
-      </label>
-      {hasAlternate && (
-        <label className="block cursor-pointer rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
-          <div className="flex items-center gap-2 text-xs font-semibold text-ink-700">
-            <input type="radio" name="draftVersion" value="alternate" form={approveFormId} />
-            Version B — pick one; the selected version is what sends
-          </div>
-          <div className="mt-1.5 text-sm font-medium">{draft.alternate_subject ?? draft.subject}</div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{draft.alternate_body}</p>
+          <span className="font-normal text-steel">— edit freely; your edits are what send</span>
         </label>
+        <input
+          name="subject_primary"
+          form={approveFormId}
+          defaultValue={draft.subject ?? ""}
+          className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1 text-sm font-medium"
+        />
+        <textarea
+          name="body_primary"
+          form={approveFormId}
+          defaultValue={draft.body ?? ""}
+          rows={Math.min(12, Math.max(5, (draft.body ?? "").split("\n").length + 2))}
+          className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1.5 text-sm leading-relaxed"
+        />
+      </div>
+      {hasAlternate && (
+        <div className="rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-700">
+            <input type="radio" name="draftVersion" value="alternate" form={approveFormId} />
+            Version B — the selected version is what sends
+          </label>
+          <input
+            name="subject_alternate"
+            form={approveFormId}
+            defaultValue={draft.alternate_subject ?? draft.subject ?? ""}
+            className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1 text-sm font-medium"
+          />
+          <textarea
+            name="body_alternate"
+            form={approveFormId}
+            defaultValue={draft.alternate_body ?? ""}
+            rows={Math.min(12, Math.max(5, (draft.alternate_body ?? "").split("\n").length + 2))}
+            className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1.5 text-sm leading-relaxed"
+          />
+        </div>
       )}
       {draft.rationale && <p className="text-xs text-steel">Why written this way: {draft.rationale}</p>}
     </div>

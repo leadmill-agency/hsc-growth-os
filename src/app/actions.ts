@@ -92,14 +92,22 @@ export async function resolveApprovalAction(formData: FormData) {
         followupId?: string;
         opportunityId?: string;
       };
-      // The card offers Version A/B — the selected version is what sends.
+      // The card offers Version A/B with editable fields — the selected
+      // version, WITH the user's edits, is exactly what sends.
       const useAlternate =
         String(formData.get("draftVersion") ?? "primary") === "alternate" &&
         !!payload.draft?.alternate_body;
-      const subject = useAlternate
-        ? (payload.draft?.alternate_subject ?? payload.draft?.subject)
-        : payload.draft?.subject;
-      const body = useAlternate ? payload.draft?.alternate_body : payload.draft?.body;
+      const editedSubject = String(
+        formData.get(useAlternate ? "subject_alternate" : "subject_primary") ?? ""
+      ).trim();
+      const editedBody = String(
+        formData.get(useAlternate ? "body_alternate" : "body_primary") ?? ""
+      ).trim();
+      const subject =
+        editedSubject ||
+        (useAlternate ? (payload.draft?.alternate_subject ?? payload.draft?.subject) : payload.draft?.subject);
+      const body =
+        editedBody || (useAlternate ? payload.draft?.alternate_body : payload.draft?.body);
       if (
         approval &&
         ["send_outreach", "send_followup"].includes(approval.approvalType) &&
@@ -169,6 +177,42 @@ export async function pursueOpportunityAction(formData: FormData) {
   revalidatePath("/opportunities");
   revalidatePath("/ploybooks");
   revalidatePath("/approvals");
+  revalidatePath("/");
+}
+
+// Manual stage control on opportunity cards (per Rameel 2026-09-10: "we
+// actually already won the flying biscuit cafe"). Won/lost/dismissed are
+// terminal; the card reflects reality even when the deal closed offline.
+export async function setOpportunityStageAction(formData: FormData) {
+  const opportunityId = String(formData.get("opportunityId") ?? "");
+  const stage = String(formData.get("stage") ?? "");
+  if (!opportunityId || !["won", "lost", "dismissed"].includes(stage)) return;
+  const db = await getDb();
+  const { opportunities } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const [updated] = await db
+    .update(opportunities)
+    .set({ stage, nextAction: null, updatedAt: new Date() })
+    .where(eq(opportunities.id, opportunityId))
+    .returning();
+  if (updated) {
+    const { logActivity, emitEvent } = await import("@/lib/events");
+    await logActivity(db, {
+      entityType: "opportunity",
+      entityId: opportunityId,
+      action: `opportunity.${stage}`,
+      detail: `${updated.name} marked ${stage} from the inbox`,
+      actor: "user",
+    });
+    await emitEvent(db, {
+      eventType: `opportunity.${stage}`,
+      opportunityId,
+      accountId: updated.accountId ?? undefined,
+      actor: "user",
+      payload: {},
+    });
+  }
+  revalidatePath("/opportunities");
   revalidatePath("/");
 }
 

@@ -134,12 +134,32 @@ export async function draftOutreach(params: {
   return llm.generateStructured({
     system:
       "You draft cold outreach for Houston Sign Crafters: UL-certified sign manufacturer, built " +
-      "in Houston, 5-year warranty, in-house permitting and installation. Rules: 120 words max, " +
-      "one clear CTA (bid access or a short call), show the research was done with ONE specific " +
-      "verified fact, no flattery, no jargon, plain English. NEVER promise instant quotes or " +
-      "mockups before a site survey — the real process is call, then survey, then mockup with " +
-      "itemized estimate. Use only facts from the brief; if a fact is not verified, do not state " +
-      "it as fact. The alternate is a relationship-building variant. Set word_count to the body's " +
+      "in Houston, 5-year warranty, in-house permitting and installation. Sender signs as Ray. " +
+      "WRITE IN THE OWNER'S REAL VOICE — these are actual emails he sent that got replies; " +
+      "match their structure, rhythm, and plainness exactly:\n\n" +
+      "EXAMPLE 1:\n" +
+      "Hi Collins,\n\nThis is Ray with Houston Sign Crafters. I saw you and Joey signed the " +
+      "Twisted Egg Shack Texas development agreement. We're a Houston-based commercial sign " +
+      "manufacturer and handle permitting and installation as well.\n\nI saw Manvel and League " +
+      "City are the first Houston-area stores. I wanted to find out who's handling the signage " +
+      "package for those locations.\n\nWe'd love to quote one of the stores.\n\n" +
+      "EXAMPLE 2:\n" +
+      "Hi Christina!\n\nThis is Ray with Houston Sign Crafters. I saw you've been managing " +
+      "several Mac Haik First Watch builds — specifically Leander, Bastrop and Creekside.\n\n" +
+      "We manufacture and install commercial signage here in Houston. We handle all permitting, " +
+      "fabrication, and installation in house.\n\nI also saw Mac Haik has the big Starbird " +
+      "rollout coming into Texas.\n\nAre you the person who handles signage vendors for new " +
+      "restaurant projects, or does someone else on your team manage that? I'd love to submit a " +
+      "competitive bid for these projects as they roll out.\n\n" +
+      "THE PATTERN: greet by first name · 'This is Ray with Houston Sign Crafters.' · ONE " +
+      "specific verified fact showing homework ('I saw...') · a one-line capability statement · " +
+      "a SECOND specific detail when the brief has one · the ask is a routing question ('who's " +
+      "handling the signage package?' / 'are you the person who..., or does someone else?') · " +
+      "soft close ('We'd love to quote...'). Short paragraphs, one thought each. 120 words max. " +
+      "No flattery, no jargon, no marketing language. NEVER promise instant quotes or mockups " +
+      "before a site survey — the real process is call, then survey, then mockup with itemized " +
+      "estimate. Use only facts from the brief; if a fact is not verified, do not state it as " +
+      "fact. The alternate is a different angle in the SAME voice. Set word_count to the body's " +
       "actual word count.",
     prompt:
       `Account: ${params.accountName}\nProject: ${params.projectName ?? "unknown"}\n\n` +
