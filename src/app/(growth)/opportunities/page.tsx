@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db/client";
-import { opportunities, projects, evidence } from "@/lib/db/schema";
+import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { submitSignalAction, pursueOpportunityAction, pullTdlrAction } from "@/app/actions";
 
@@ -16,13 +16,33 @@ function scoreBadge(score: number | null) {
   return { label: String(score), cls: "bg-cloud text-steel" };
 }
 
-const nextActionLabels: Record<string, string> = {
-  "Launch pb01_gc_pursuit": "Pursue as GC bid",
-  "Launch pb02": "Map the development",
-  "Launch pb03": "Pursue franchise rollout",
-  "Launch pb04": "Pursue facility portfolio",
-  review: "Review",
-  "Identify owner/GC first (research)": "Identify owner/GC first",
+// Label + what actually happens if you hit Pursue on it (shown as a tooltip —
+// "Review" vs "Map the development" was opaque, per Rameel 2026-09-10).
+const nextActionLabels: Record<string, { label: string; help: string }> = {
+  "Launch pb01_gc_pursuit": {
+    label: "Pursue as GC bid",
+    help: "Radar thinks a GC is taking bids here. Pursue researches the GC and drafts an intro email for your approval.",
+  },
+  "Launch pb02": {
+    label: "Map the development",
+    help: "Radar spotted a multi-tenant development. Pursue breaks it into every individual sign opportunity (tenants, monument, wayfinding).",
+  },
+  "Launch pb03": {
+    label: "Pursue franchise rollout",
+    help: "Radar spotted a franchise expanding. Pursue researches their Texas rollout and drafts outreach to the franchising team.",
+  },
+  "Launch pb04": {
+    label: "Pursue facility portfolio",
+    help: "Radar spotted a multi-location operator. Pursue maps their locations and drafts a portfolio pitch.",
+  },
+  review: {
+    label: "Needs your read",
+    help: "The radar wasn't confident what this is — open the original signal below and decide. Pursue still works: it researches the owner first.",
+  },
+  "Identify owner/GC first (research)": {
+    label: "Identify owner/GC first",
+    help: "Nobody is named on this filing yet. Pursue starts by finding out who owns the project before any outreach.",
+  },
 };
 
 const sourceLabels: Record<string, string> = {
@@ -57,19 +77,31 @@ export default async function OpportunitiesPage() {
   const projectById = new Map(projectRows.map((p) => [p.id, p]));
 
   const oppIds = rows.map((r) => r.id);
-  const whyRows = oppIds.length
+  const evidenceRows = oppIds.length
     ? await db.query.evidence.findMany({
         where: and(
           eq(evidence.entityType, "opportunity"),
-          eq(evidence.fieldName, "why_this_matters"),
+          inArray(evidence.fieldName, ["why_this_matters", "origin_signal"]),
           inArray(evidence.entityId, oppIds)
         ),
         orderBy: desc(evidence.retrievedAt),
       })
     : [];
   const whyByOpp = new Map<string, string>();
-  for (const row of whyRows) {
-    if (!whyByOpp.has(row.entityId)) whyByOpp.set(row.entityId, String(row.value ?? ""));
+  const signalByOpp = new Map<string, string>();
+  for (const row of evidenceRows) {
+    const target = row.fieldName === "why_this_matters" ? whyByOpp : signalByOpp;
+    if (!target.has(row.entityId)) target.set(row.entityId, String(row.value ?? ""));
+  }
+
+  // Best-known person to talk to, per account (research/swarm fill these in).
+  const accountIds = [...new Set(rows.map((r) => r.accountId).filter((id): id is string => !!id))];
+  const contactRows = accountIds.length
+    ? await db.query.contacts.findMany({ where: inArray(contacts.accountId, accountIds) })
+    : [];
+  const contactByAccount = new Map<string, (typeof contactRows)[number]>();
+  for (const c of contactRows) {
+    if (c.accountId && !contactByAccount.has(c.accountId)) contactByAccount.set(c.accountId, c);
   }
 
   return (
@@ -129,7 +161,14 @@ export default async function OpportunitiesPage() {
             ? Number(project.estimatedProjectValue)
             : null;
           const why = whyByOpp.get(o.id);
-          const action = o.nextAction ? (nextActionLabels[o.nextAction] ?? o.nextAction) : null;
+          const signal = signalByOpp.get(o.id);
+          const contact = o.accountId ? contactByAccount.get(o.accountId) : null;
+          const address = [project?.address, project?.city].filter(Boolean).join(", ");
+          const sourceLink =
+            o.sourceDetail && /^https?:\/\//.test(o.sourceDetail) ? o.sourceDetail : null;
+          const action = o.nextAction
+            ? (nextActionLabels[o.nextAction] ?? { label: o.nextAction, help: "" })
+            : null;
           return (
             <div key={o.id} className="rounded-lg border border-fog bg-white p-4">
               <div className="flex items-start gap-4">
@@ -153,9 +192,44 @@ export default async function OpportunitiesPage() {
                         project ~${projectValue.toLocaleString()}
                       </span>
                     )}
-                    {o.source && <span>{sourceLabels[o.source] ?? o.source}</span>}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-steel">
+                    {address && <span title="Project address">📍 {address}</span>}
+                    <span title="Where this came from">
+                      Found via {sourceLabels[o.source ?? ""] ?? o.source ?? "unknown"}
+                      {o.createdAt && ` on ${o.createdAt.toISOString().slice(0, 10)}`}
+                      {sourceLink && (
+                        <>
+                          {" · "}
+                          <a href={sourceLink} target="_blank" className="underline hover:text-signal">
+                            view source
+                          </a>
+                        </>
+                      )}
+                    </span>
+                    {contact ? (
+                      <span title="Best known contact (found by research)">
+                        👤 {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
+                        {contact.title ? `, ${contact.title}` : ""}
+                        {contact.email ? ` · ${contact.email}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-steel/70" title="Research and Pursue find the decision-makers">
+                        👤 no contact yet — Pursue finds one
+                      </span>
+                    )}
                   </div>
                   {why && <p className="mt-2 text-sm text-ink-700">{why}</p>}
+                  {signal && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-steel hover:text-signal">
+                        View the original signal
+                      </summary>
+                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-cloud p-2 font-sans text-xs text-ink-700">
+                        {signal}
+                      </pre>
+                    </details>
+                  )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   {o.stage === "discovered" && (
@@ -166,7 +240,14 @@ export default async function OpportunitiesPage() {
                       </button>
                     </form>
                   )}
-                  {action && <div className="text-right text-xs text-steel">{action}</div>}
+                  {action && (
+                    <div
+                      className="max-w-40 cursor-help text-right text-xs text-steel underline decoration-dotted underline-offset-2"
+                      title={action.help}
+                    >
+                      {action.label}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

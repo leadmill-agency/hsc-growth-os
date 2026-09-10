@@ -46,6 +46,7 @@ const radarParse = {
   company_name: "OAKBERRY",
   company_type: "franchise",
   project_name: null,
+  project_address: null,
   city: "Houston",
   trade_relevance: "likely_signage",
   opportunity_type: "franchise expansion",

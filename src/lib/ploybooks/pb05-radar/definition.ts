@@ -16,6 +16,7 @@ const signalParseSchema = z.object({
   company_type: z
     .enum(["general_contractor", "developer", "franchise", "facility_operator", "property_owner", "other", "unknown"]),
   project_name: z.string().nullable(),
+  project_address: z.string().nullable(), // street address when the signal states one
   city: z.string().nullable(),
   trade_relevance: z.enum(["explicit_signage", "likely_signage", "adjacent", "irrelevant"]),
   opportunity_type: z.string().max(60), // short label, not a sentence
@@ -109,6 +110,7 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         const { project } = parsed.project_name
           ? await createProject(ctx.db, {
               name: parsed.project_name,
+              address: parsed.project_address ?? undefined,
               city: parsed.city ?? undefined,
               state: "TX",
               source: p.source ?? "radar",

@@ -11,6 +11,7 @@ export const harveySignalParse = {
   company_name: "Harvey Cleary",
   company_type: "general_contractor",
   project_name: "UH Engineering Building",
+  project_address: null,
   city: "Houston",
   trade_relevance: "explicit_signage",
   opportunity_type: "gc_bid",
