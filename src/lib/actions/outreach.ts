@@ -153,14 +153,20 @@ export async function draftOutreach(params: {
       "competitive bid for these projects as they roll out.\n\n" +
       "THE PATTERN: greet by first name · 'This is Ray with Houston Sign Crafters.' · ONE " +
       "specific verified fact showing homework ('I saw...') · a one-line capability statement · " +
-      "a SECOND specific detail when the brief has one · the ask is a routing question ('who's " +
-      "handling the signage package?' / 'are you the person who..., or does someone else?') · " +
-      "soft close ('We'd love to quote...'). Short paragraphs, one thought each. 120 words max. " +
-      "No flattery, no jargon, no marketing language. NEVER promise instant quotes or mockups " +
-      "before a site survey — the real process is call, then survey, then mockup with itemized " +
-      "estimate. Use only facts from the brief; if a fact is not verified, do not state it as " +
-      "fact. The alternate is a different angle in the SAME voice. Set word_count to the body's " +
-      "actual word count.",
+      "a SECOND specific detail when the brief has one · THE ASK, always a routing question: " +
+      "are YOU the person in charge of bidding out the sign package for this project, or does " +
+      "a different department/person handle that? · soft close ('We'd love to quote...'). " +
+      "FORMATTING: one thought per paragraph, ONE OR TWO SHORT SENTENCES each, with a blank " +
+      "line between every paragraph — 4 to 6 short paragraphs, never a wall of text. " +
+      "JARGON BAN: never write like a database. No 'registered with TDLR', 'TABS filing', " +
+      "'certificate of occupancy', 'CO issued', 'per the filing' — translate to how a person " +
+      "talks: 'I saw your new building on the Gulf Freeway', 'I saw y'all are opening a " +
+      "location in Katy', 'I saw the addition you're planning in Conroe'. 120 words max. No " +
+      "flattery, no marketing language. NEVER promise instant quotes or mockups before a site " +
+      "survey — the real process is call, then survey, then mockup with itemized estimate. Use " +
+      "only facts from the brief; if a fact is not verified, do not state it as fact. The " +
+      "alternate is a different angle in the SAME voice. Set word_count to the body's actual " +
+      "word count.",
     prompt:
       `Account: ${params.accountName}\nProject: ${params.projectName ?? "unknown"}\n\n` +
       `Brief:\n${JSON.stringify({

@@ -82,16 +82,15 @@ export default async function OpportunitiesPage({
   const db = await getDb();
   const { sql, notInArray } = await import("drizzle-orm");
   const filter = sourceFilters.find((f) => f.key === activeFilter);
-  const { ne } = await import("drizzle-orm");
   const sourceWhere = filter
     ? filter.sources.length
       ? inArray(opportunities.source, filter.sources)
       : notInArray(sql`coalesce(${opportunities.source}, '')`, knownSources)
     : undefined;
-  // Dismissed cards leave the working list for good; won/lost stay visible.
-  const where = sourceWhere
-    ? and(ne(opportunities.stage, "dismissed"), sourceWhere)
-    : ne(opportunities.stage, "dismissed");
+  // This is a working list: won, lost, and dismissed all leave it (per Rameel).
+  // Closed deals live on in Accounts, History, and the brief's win numbers.
+  const openStages = notInArray(opportunities.stage, ["dismissed", "won", "lost"]);
+  const where = sourceWhere ? and(openStages, sourceWhere) : openStages;
   // Best first (per Rameel): score desc, newest breaks ties.
   const rows = await db.query.opportunities.findMany({
     where,
@@ -104,6 +103,7 @@ export default async function OpportunitiesPage({
   const sourceCounts = await db
     .select({ source: opportunities.source, n: sql<number>`count(*)::int` })
     .from(opportunities)
+    .where(openStages)
     .groupBy(opportunities.source);
   const countFor = (f: (typeof sourceFilters)[number]) =>
     sourceCounts
