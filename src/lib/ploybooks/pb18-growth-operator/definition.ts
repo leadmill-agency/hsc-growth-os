@@ -176,7 +176,9 @@ const briefSchema = z.object({
       ploybook_key: z.string().nullable(),
       target: z.string(),
       reason: z.string(),
-      priority: z.number().min(1).max(5),
+      // No .min/.max: a model writing priority 6 on a 6th item once failed the
+      // whole brief on validation. Priority only orders the list — clamp, don't die.
+      priority: z.number(),
     })
   ),
   watchouts: z.array(z.string()),
