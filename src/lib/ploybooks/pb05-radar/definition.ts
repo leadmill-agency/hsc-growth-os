@@ -45,7 +45,12 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           system:
             "You classify raw commercial-construction signals for Houston Sign Crafters " +
             "(signs/awnings, Houston TX). Extract only what the signal actually says; everything " +
-            "else goes in unknowns. opportunity_type is a SHORT label (2-4 words, e.g. 'new " +
+            "else goes in unknowns. TENANT RULE (from the owner): when a filing or project name " +
+            "names the TENANT moving in (e.g. 'Chipotle finish-out', 'Interior build-out for " +
+            "Acme Dental'), the tenant is the one who buys signs — extract the tenant as " +
+            "company_name (company_type 'other' unless clearly a franchise/operator) and score " +
+            "at the TOP of the band; a named tenant beats a named owner or GC as a signal. " +
+            "opportunity_type is a SHORT label (2-4 words, e.g. 'new " +
             "construction', 'commercial remodel') — never a sentence. " +
             "estimated_construction_value_usd only when the signal states a dollar figure. " +
             "trade_relevance is explicit_signage only when signage/awning " +
@@ -53,6 +58,8 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "these anchors and use the FULL range — never park everything at a safe middle " +
             "value; two different signals should almost never share a score: " +
             "92 = active Houston bid invite explicitly naming signage/awning scope. " +
+            "85 = interior build-out/finish-out with the TENANT named — a business moving in " +
+            "needs signs on a known timeline. " +
             "80 = ground-up retail/restaurant/hotel in the Houston metro, $1M+ — signage " +
             "near-certain even if unstated. " +
             "68 = commercial remodel/build-out in the metro, signage plausible but unstated, " +
