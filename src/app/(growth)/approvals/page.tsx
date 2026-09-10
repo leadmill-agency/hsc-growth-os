@@ -200,7 +200,12 @@ function RfqListView({ rfqs }: { rfqs: { supplier_category?: string; subject?: s
   );
 }
 
-export default async function ApprovalsPage() {
+export default async function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   const db = await getDb();
   const pending = await db.query.approvals.findMany({
     where: eq(approvals.status, "pending"),
@@ -343,39 +348,54 @@ export default async function ApprovalsPage() {
     );
   };
 
+  // Tabs (per Rameel 2026-09-10): Emails To Send first, Bid Decisions second.
+  // "Other" appears only when something is actually in it.
+  const tabs = [
+    { key: "emails", label: "Emails To Send", items: emailsToSend, blurb: "nothing sends without you" },
+    { key: "bids", label: "Bid Decisions", items: bidDecisions, blurb: "approve = we're bidding, reject = pass" },
+    ...(everythingElse.length > 0
+      ? [{ key: "other", label: "Other", items: everythingElse, blurb: "" }]
+      : []),
+  ];
+  const activeTab = tabs.find((t) => t.key === tab) ?? tabs[0];
+
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-semibold">Approvals</h1>
-      {pending.length === 0 && (
-        <p className="text-sm text-steel">Nothing pending. New drafts and decisions land here.</p>
-      )}
 
-      {bidDecisions.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-ink-700">
-            Bid decisions ({bidDecisions.length}) — approve = we&apos;re bidding, reject = pass
-          </h2>
-          {bidDecisions.map(renderCard)}
-        </section>
-      )}
+      <div className="flex gap-1 border-b border-fog">
+        {tabs.map((t) => (
+          <a
+            key={t.key}
+            href={`/approvals?tab=${t.key}`}
+            className={`-mb-px rounded-t-lg border-x border-t px-4 py-2 text-sm font-medium ${
+              activeTab.key === t.key
+                ? "border-fog bg-white text-ink"
+                : "border-transparent text-steel hover:text-ink"
+            }`}
+          >
+            {t.label}
+            <span
+              className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                t.items.length > 0 ? "bg-signal text-white" : "bg-cloud text-steel"
+              }`}
+            >
+              {t.items.length}
+            </span>
+          </a>
+        ))}
+      </div>
 
-      {emailsToSend.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-ink-700">
-            Emails to send ({emailsToSend.length}) — nothing sends without you
-          </h2>
-          {emailsToSend.map(renderCard)}
-        </section>
-      )}
-
-      {everythingElse.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-ink-700">
-            Other approvals ({everythingElse.length})
-          </h2>
-          {everythingElse.map(renderCard)}
-        </section>
-      )}
+      <section className="space-y-3">
+        {activeTab.blurb && <p className="text-xs text-steel">{activeTab.blurb}</p>}
+        {activeTab.items.length === 0 && (
+          <p className="text-sm text-steel">
+            Nothing here right now. New {activeTab.key === "emails" ? "drafts" : "decisions"} land
+            in this tab automatically.
+          </p>
+        )}
+        {activeTab.items.map(renderCard)}
+      </section>
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink-700">Recently resolved</h2>
