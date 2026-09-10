@@ -41,6 +41,17 @@ describe("guarded send layer", () => {
     await expect(sendExternal(db, rejected.id, message)).rejects.toThrow(/not approved/);
   });
 
+  it("enforces the daily warm-up cap", async () => {
+    process.env.ALLOW_EXTERNAL_SEND = "true";
+    process.env.SEND_DAILY_CAP = "1";
+    registerSendAdapter(async () => ({ providerId: "m1" }));
+    const first = await makeApproval("approved");
+    await sendExternal(db, first.id, message);
+    const second = await makeApproval("approved");
+    await expect(sendExternal(db, second.id, message)).rejects.toThrow(/daily send cap/);
+    delete process.env.SEND_DAILY_CAP;
+  });
+
   it("sends once per approval and refuses the second attempt (idempotency)", async () => {
     process.env.ALLOW_EXTERNAL_SEND = "true";
     let calls = 0;

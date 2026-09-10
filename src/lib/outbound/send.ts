@@ -34,9 +34,37 @@ export function registerSendAdapter(fn: SendAdapter | null) {
   adapter = fn;
 }
 
+/** Deliverability warm-up: cap daily sends while the new domain builds reputation. */
+export function dailySendCap(): number {
+  return Number(process.env.SEND_DAILY_CAP ?? 15);
+}
+
+export async function sentToday(db: Db): Promise<number> {
+  const { and, count, eq, gte } = await import("drizzle-orm");
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const [row] = await db
+    .select({ n: count() })
+    .from(interactions)
+    .where(
+      and(
+        eq(interactions.type, "email"),
+        eq(interactions.direction, "outbound"),
+        eq(interactions.source, "growth_os"),
+        gte(interactions.occurredAt, startOfDay)
+      )
+    );
+  return row.n;
+}
+
 export async function sendExternal(db: Db, approvalId: string, message: OutboundMessage) {
   if (process.env.ALLOW_EXTERNAL_SEND !== "true") {
     throw new SendBlockedError("ALLOW_EXTERNAL_SEND is not enabled in this environment");
+  }
+  if ((await sentToday(db)) >= dailySendCap()) {
+    throw new SendBlockedError(
+      `daily send cap (${dailySendCap()}) reached — domain warm-up limit; try tomorrow or raise SEND_DAILY_CAP`
+    );
   }
   const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
   if (!approval) throw new SendBlockedError(`approval ${approvalId} not found`);
