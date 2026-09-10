@@ -61,6 +61,7 @@ interface EmailDraft {
   suggested_email?: string;
   suggested_email_confidence?: number;
   suggested_email_source?: string;
+  suggested_email_note?: string;
 }
 
 function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFormId: string }) {
@@ -82,6 +83,8 @@ function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFo
               </span>{" "}
               <span className="text-steel">— pre-filled below</span>
             </span>
+          ) : draft.suggested_email_note ? (
+            <span className="text-xs font-medium text-amber-700">— {draft.suggested_email_note}</span>
           ) : (
             <span className="text-xs text-steel">— no email found automatically; paste their verified email below to send</span>
           )}

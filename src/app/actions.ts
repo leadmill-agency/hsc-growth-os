@@ -168,13 +168,20 @@ export async function findEmailForApprovalAction(formData: FormData) {
   const found = fullName
     ? await findWorkEmail({ fullName, domain: domain ?? undefined, company: account?.name })
     : null;
+  // Say WHY when nothing comes back — a silent no-op reads as a dead button.
+  const failureNote = !fullName
+    ? "No contact name on this draft to look up"
+    : !domain
+      ? `No website on file for ${account?.name ?? "this company"} — Hunter needs a domain. Find their site, add it on the account, and try again (or check LinkedIn).`
+      : `Hunter has no email for ${fullName} at ${domain} — try LinkedIn or the company site.`;
   const patch = found
     ? {
         suggested_email: found.email,
         suggested_email_confidence: found.confidence,
         suggested_email_source: found.source,
+        suggested_email_note: null,
       }
-    : { suggested_email_note: "No email found — try LinkedIn or the company site" };
+    : { suggested_email_note: failureNote };
   await db
     .update(approvals)
     .set({
