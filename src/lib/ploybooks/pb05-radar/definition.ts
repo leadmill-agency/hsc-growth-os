@@ -49,9 +49,20 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "construction', 'commercial remodel') — never a sentence. " +
             "estimated_construction_value_usd only when the signal states a dollar figure. " +
             "trade_relevance is explicit_signage only when signage/awning " +
-            "scope is stated. estimated_relevance_score is on a 0-100 scale (NOT 0-10): 85-100 " +
-            "pursue now (Houston + explicit signage + active bid), 70-84 strong, 50-69 monitor, " +
-            "<50 weak. suggested_ploybook: pb01_gc_pursuit for GC/bid signals; none if irrelevant.",
+            "scope is stated. estimated_relevance_score is 0-100 (NOT 0-10). Calibrate against " +
+            "these anchors and use the FULL range — never park everything at a safe middle " +
+            "value; two different signals should almost never share a score: " +
+            "92 = active Houston bid invite explicitly naming signage/awning scope. " +
+            "80 = ground-up retail/restaurant/hotel in the Houston metro, $1M+ — signage " +
+            "near-certain even if unstated. " +
+            "68 = commercial remodel/build-out in the metro, signage plausible but unstated, " +
+            "owner/GC unknown. " +
+            "55 = office/industrial TI or facility remodel where signage is a maybe. " +
+            "35 = infrastructure/civil work (roads, utilities) — signage unlikely. " +
+            "15 = residential or clearly sign-free scope. " +
+            "Adjust within a band: up for stated dollar value, a named GC/owner, near-term " +
+            "dates; down for outside the metro or vague scope. " +
+            "suggested_ploybook: pb01_gc_pursuit for GC/bid signals; none if irrelevant.",
           prompt: `SIGNAL:\n${p.signalText}\n${p.sourceUrl ? `URL: ${p.sourceUrl}` : ""}`,
           schema: signalParseSchema,
           effort: "low",

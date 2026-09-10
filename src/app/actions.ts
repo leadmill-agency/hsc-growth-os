@@ -221,6 +221,92 @@ export async function analyzeBidAction(formData: FormData) {
   revalidatePath("/ploybooks");
 }
 
+// Record what happened to a bid. "Submitted" is the moment that matters: it
+// fires bid.submitted, which auto-creates the Day-2/7/14/30 follow-up cadence
+// (previously only the PB12 QA gate could do this — bids submitted straight in
+// PlanHub never started their follow-ups). Won/Lost close the loop and cancel
+// any follow-ups still pending.
+export async function recordBidOutcomeAction(formData: FormData) {
+  const bidId = String(formData.get("bidId") ?? "");
+  const outcome = String(formData.get("outcome") ?? "");
+  if (!bidId || !["submitted", "won", "lost"].includes(outcome)) return;
+  const db = await getDb();
+  const { bids, opportunities, followups } = await import("@/lib/db/schema");
+  const { and, eq, inArray } = await import("drizzle-orm");
+  const { emitEvent, logActivity } = await import("@/lib/events");
+  const bid = await db.query.bids.findFirst({ where: eq(bids.id, bidId) });
+  if (!bid) return;
+
+  if (outcome === "submitted") {
+    if (bid.status === "submitted") return; // don't double-fire the follow-up cadence
+    const [updated] = await db
+      .update(bids)
+      .set({ submittedAt: new Date(), status: "submitted", updatedAt: new Date() })
+      .where(eq(bids.id, bidId))
+      .returning();
+    await logActivity(db, {
+      entityType: "bid",
+      entityId: bidId,
+      action: "bid.submitted",
+      detail: "Marked submitted from the bid desk",
+      actor: "user",
+    });
+    await emitEvent(db, {
+      eventType: "bid.submitted", // PB13 subscription creates the follow-up cadence
+      bidId,
+      opportunityId: updated.opportunityId ?? undefined,
+      actor: "user",
+      payload: { submittedAt: updated.submittedAt?.toISOString() },
+    });
+  } else {
+    const won = outcome === "won";
+    const awardAmount = String(formData.get("awardAmount") ?? "").replace(/[$,\s]/g, "");
+    const lossReason = String(formData.get("lossReason") ?? "").trim();
+    await db
+      .update(bids)
+      .set({
+        status: outcome,
+        awardAmount: won && awardAmount ? awardAmount : undefined,
+        lossReason: !won && lossReason ? lossReason : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(bids.id, bidId));
+    if (bid.opportunityId) {
+      await db
+        .update(opportunities)
+        .set({ stage: won ? "won" : "lost", updatedAt: new Date() })
+        .where(eq(opportunities.id, bid.opportunityId));
+    }
+    // Outcome known → any remaining follow-ups are moot.
+    await db
+      .update(followups)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(and(eq(followups.bidId, bidId), inArray(followups.status, ["pending", "drafted"])));
+    await logActivity(db, {
+      entityType: "bid",
+      entityId: bidId,
+      action: won ? "bid.won" : "bid.lost",
+      detail: won
+        ? awardAmount
+          ? `Won — $${Number(awardAmount).toLocaleString()}`
+          : "Won"
+        : lossReason
+          ? `Lost — ${lossReason}`
+          : "Lost",
+      actor: "user",
+    });
+    await emitEvent(db, {
+      eventType: won ? "bid.won" : "bid.lost",
+      bidId,
+      opportunityId: bid.opportunityId ?? undefined,
+      actor: "user",
+      payload: won ? { awardAmount: awardAmount || null } : { lossReason: lossReason || null },
+    });
+  }
+  revalidatePath("/bids");
+  revalidatePath("/");
+}
+
 // Standalone bid-desk entry (per Rameel: "when looking at bids, i dont see a place
 // where i can upload zip files") — no pre-existing bid row required. Creates the
 // minimal opportunity + bid, then runs the same upload→analyze path.

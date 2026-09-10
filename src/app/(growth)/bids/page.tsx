@@ -6,6 +6,7 @@ import {
   uploadBidPackageAction,
   startBidFromPackageAction,
   launchPloybookAction,
+  recordBidOutcomeAction,
 } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
@@ -161,6 +162,53 @@ export default async function BidsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Record what actually happened — "submitted" starts the Day-2/7/14/30
+                  follow-ups, won/lost close the loop (and cancel pending follow-ups). */}
+              {active && bid.status !== "submitted" && (
+                <form
+                  action={recordBidOutcomeAction}
+                  className="mt-3 flex items-center gap-2 border-t border-cloud pt-3"
+                >
+                  <input type="hidden" name="bidId" value={bid.id} />
+                  <input type="hidden" name="outcome" value="submitted" />
+                  <button className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
+                    Mark submitted
+                  </button>
+                  <span className="text-[11px] text-steel">
+                    submitted the proposal in PlanHub or by email? Click this — it starts the
+                    automatic follow-up cadence
+                  </span>
+                </form>
+              )}
+              {bid.status === "submitted" && (
+                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-cloud pt-3">
+                  <form action={recordBidOutcomeAction} className="flex items-center gap-1.5">
+                    <input type="hidden" name="bidId" value={bid.id} />
+                    <input type="hidden" name="outcome" value="won" />
+                    <input
+                      name="awardAmount"
+                      placeholder="Award $ (optional)"
+                      className="w-32 rounded border border-fog px-2 py-1 text-xs"
+                    />
+                    <button className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700">
+                      We won
+                    </button>
+                  </form>
+                  <form action={recordBidOutcomeAction} className="flex items-center gap-1.5">
+                    <input type="hidden" name="bidId" value={bid.id} />
+                    <input type="hidden" name="outcome" value="lost" />
+                    <input
+                      name="lossReason"
+                      placeholder="Why lost? (optional)"
+                      className="w-44 rounded border border-fog px-2 py-1 text-xs"
+                    />
+                    <button className="rounded border border-red-300 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
+                      We lost
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           );
         })}

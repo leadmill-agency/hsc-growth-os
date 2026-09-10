@@ -159,6 +159,14 @@ export async function createOpportunity(
       where: and(eq(opportunities.accountId, input.accountId), isNull(opportunities.projectId)),
     });
     if (existing) return { opportunity: existing, created: false as const };
+  } else if (input.projectId) {
+    // Owner-unknown signals (most TDLR filings) anchor on the project alone —
+    // one filing per floor/phase must not become one opportunity per filing.
+    const { isNull } = await import("drizzle-orm");
+    const existing = await db.query.opportunities.findFirst({
+      where: and(eq(opportunities.projectId, input.projectId), isNull(opportunities.accountId)),
+    });
+    if (existing) return { opportunity: existing, created: false as const };
   }
   const [opportunity] = await db
     .insert(opportunities)
