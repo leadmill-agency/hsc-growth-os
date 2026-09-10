@@ -72,6 +72,7 @@ export const manvelProfile = {
     { name: "DXU Architects", role: "architect", status: "inferred" },
     { name: "Unknown GC LLC", role: "general_contractor", status: "assumed" },
   ],
+  is_multi_tenant_commercial: true,
   announced_tenants: [
     { name: "Potbelly (Biddy Restaurant Group)", category: "restaurant", status: "verified" },
     { name: "Chipotle", category: "restaurant", status: "verified" },

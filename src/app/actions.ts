@@ -139,6 +139,51 @@ export async function resolveApprovalAction(formData: FormData) {
   revalidatePath("/");
 }
 
+// On-demand Hunter lookup from an approval card (per Rameel 2026-09-10):
+// finds the draft's target contact email and stores it on the card.
+export async function findEmailForApprovalAction(formData: FormData) {
+  const approvalId = String(formData.get("approvalId") ?? "");
+  if (!approvalId) return;
+  const db = await getDb();
+  const { approvals, opportunities, accounts } = await import("@/lib/db/schema");
+  const { eq, sql } = await import("drizzle-orm");
+  const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
+  const payload = (approval?.payload ?? {}) as {
+    draft?: { target_contact?: string };
+    opportunityId?: string;
+  };
+  const target = payload.draft?.target_contact;
+  if (!approval || !target) return;
+  const opp = payload.opportunityId
+    ? await db.query.opportunities.findFirst({ where: eq(opportunities.id, payload.opportunityId) })
+    : null;
+  const account = opp?.accountId
+    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
+    : null;
+  const domain =
+    account?.domain ??
+    account?.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  const fullName = target.split(",")[0]?.trim();
+  const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
+  const found = fullName
+    ? await findWorkEmail({ fullName, domain: domain ?? undefined, company: account?.name })
+    : null;
+  const patch = found
+    ? {
+        suggested_email: found.email,
+        suggested_email_confidence: found.confidence,
+        suggested_email_source: found.source,
+      }
+    : { suggested_email_note: "No email found — try LinkedIn or the company site" };
+  await db
+    .update(approvals)
+    .set({
+      payload: sql`jsonb_set(${approvals.payload}, '{draft}', (${approvals.payload}->'draft') || ${JSON.stringify(patch)}::jsonb)`,
+    })
+    .where(eq(approvals.id, approvalId));
+  revalidatePath("/approvals");
+}
+
 export async function retryRunAction(formData: FormData) {
   const runId = String(formData.get("runId") ?? "");
   const db = await getDb();

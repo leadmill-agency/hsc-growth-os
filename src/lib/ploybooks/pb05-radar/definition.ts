@@ -77,7 +77,10 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "dates; down for vague scope. GEOGRAPHY: signage-only work outside the Houston " +
             "metro (~150 mi) scores down sharply (<50) — but awning/canopy scope is served " +
             "STATEWIDE: score any Texas awning/canopy work on its merits, no metro penalty. " +
-            "suggested_ploybook: pb01_gc_pursuit for GC/bid signals; none if irrelevant.",
+            "suggested_ploybook: pb01_gc_pursuit for GC/bid signals; pb02 ONLY for genuine " +
+            "multi-tenant commercial developments (retail centers, mixed-use) — never schools, " +
+            "civic buildings, or single-tenant projects; pb03 franchise expansion; pb04 " +
+            "multi-location operators; none if irrelevant.",
           prompt: `SIGNAL:\n${p.signalText}\n${p.sourceUrl ? `URL: ${p.sourceUrl}` : ""}`,
           schema: signalParseSchema,
           effort: "low",

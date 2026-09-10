@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db/client";
-import { approvals, ploybookRuns, opportunities } from "@/lib/db/schema";
+import { approvals, ploybookRuns, opportunities, accounts } from "@/lib/db/schema";
 import { desc, eq, inArray, ne } from "drizzle-orm";
-import { resolveApprovalAction } from "@/app/actions";
+import {
+  resolveApprovalAction,
+  findEmailForApprovalAction,
+  launchAccountPloybookAction,
+} from "@/app/actions";
 import { PLOYBOOK_GUIDES } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
@@ -234,6 +238,11 @@ export default async function ApprovalsPage({
     ? await db.query.opportunities.findMany({ where: inArray(opportunities.id, oppIds) })
     : [];
   const oppById = new Map(opps.map((o) => [o.id, o]));
+  const acctIds = [...new Set(opps.map((o) => o.accountId).filter((id): id is string => !!id))];
+  const accts = acctIds.length
+    ? await db.query.accounts.findMany({ where: inArray(accounts.id, acctIds) })
+    : [];
+  const acctById = new Map(accts.map((a) => [a.id, a]));
 
   // Two different kinds of work (per Rameel 2026-09-10): deciding on bids vs
   // sending communications. Group them so the inbox matches how he thinks.
@@ -343,6 +352,34 @@ export default async function ApprovalsPage({
                   Reject
                 </button>
               </form>
+              {a.approvalType === "send_outreach" && (
+                <>
+                  {!((a.payload ?? {}) as { draft?: EmailDraft }).draft?.suggested_email && (
+                    <form action={findEmailForApprovalAction}>
+                      <input type="hidden" name="approvalId" value={a.id} />
+                      <button
+                        className="rounded border border-fog bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:border-signal"
+                        title="Look up this contact's work email with Hunter and pre-fill it here"
+                      >
+                        Find email
+                      </button>
+                    </form>
+                  )}
+                  {opp?.accountId && acctById.get(opp.accountId) && (
+                    <form action={launchAccountPloybookAction}>
+                      <input type="hidden" name="accountName" value={acctById.get(opp.accountId)!.name} />
+                      <input type="hidden" name="accountId" value={opp.accountId} />
+                      <input type="hidden" name="which" value="swarm" />
+                      <button
+                        className="rounded border border-fog bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:border-signal"
+                        title="One contact isn't enough? Draft outreach to multiple people at this company — all drafts land back here"
+                      >
+                        Swarm this company
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
             </div>
           </div>
     );

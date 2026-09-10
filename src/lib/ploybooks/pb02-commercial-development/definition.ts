@@ -29,6 +29,10 @@ export const developmentProfileSchema = z.object({
       status: evidenceStatus,
     })
   ),
+  // Guard (2026-09-10): PB02 once mapped an elementary school as a retail
+  // development and invented tenant pairings for it. The profile must declare
+  // what this actually is before any tenant records get created.
+  is_multi_tenant_commercial: z.boolean(),
   announced_tenants: z.array(
     z.object({ name: z.string(), category: z.string().nullable(), status: evidenceStatus })
   ),
@@ -110,7 +114,11 @@ export const pb02CommercialDevelopment: PloybookDefinition = {
         const profile = await llm.generateStructured({
           system:
             "Extract a development profile for a Houston sign company. Use ONLY the research " +
-            "text. Evidence status on every player and tenant. Revenue estimates: only provide " +
+            "text. is_multi_tenant_commercial: true ONLY for genuine multi-tenant commercial " +
+            "developments (retail centers, mixed-use, business parks). Schools, hospitals, " +
+            "civic buildings, and single-tenant projects are FALSE and get NO announced_tenants " +
+            "— nearby businesses are not tenants of the project. " +
+            "Evidence status on every player and tenant. Revenue estimates: only provide " +
             "numbers if the research supports a reasoned range from tenant count and scope; " +
             "they are ASSUMPTIONS and will be labeled as such — null is always acceptable. " +
             "Unestablished facts go in unknowns. Never invent players or tenants.",
@@ -156,6 +164,13 @@ export const pb02CommercialDevelopment: PloybookDefinition = {
       async run(ctx) {
         const prior = ctx.priorOutputs["create_development"];
         const profile = ctx.priorOutputs["research_development"].profile as DevelopmentProfile;
+        if (!profile.is_multi_tenant_commercial) {
+          return {
+            kind: "skipped",
+            reason:
+              "Not a multi-tenant commercial development (school/civic/single-tenant) — no tenant opportunities created",
+          };
+        }
         const childIds: string[] = [];
         for (const tenant of profile.announced_tenants) {
           if (tenant.status === "assumed" || tenant.status === "unknown") continue;
