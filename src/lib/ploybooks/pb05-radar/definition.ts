@@ -58,10 +58,15 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "these anchors and use the FULL range — never park everything at a safe middle " +
             "value; two different signals should almost never share a score: " +
             "92 = active Houston bid invite explicitly naming signage/awning scope. " +
-            "85 = interior build-out/finish-out with the TENANT named — a business moving in " +
-            "needs signs on a known timeline. " +
+            "85 = a recognizable BRAND, franchise, or multi-location operator moving in (named " +
+            "tenant build-out or certificate of occupancy) — they need signs on a known " +
+            "timeline and can buy again. " +
             "80 = ground-up retail/restaurant/hotel in the Houston metro, $1M+ — signage " +
             "near-certain even if unstated. " +
+            "74 = an independent small business moving in (CO or finish-out with a business " +
+            "name) — real, immediate, but a one-location job. " +
+            "60 = a CO or filing naming only an individual person or an LLC with no clue what " +
+            "the business is — could be anything; needs a human glance. " +
             "68 = commercial remodel/build-out in the metro, signage plausible but unstated, " +
             "owner/GC unknown. " +
             "55 = office/industrial TI or facility remodel where signage is a maybe. " +
