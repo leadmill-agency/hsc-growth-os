@@ -65,8 +65,48 @@ export async function resumeRunAction(formData: FormData) {
 export async function resolveApprovalAction(formData: FormData) {
   const approvalId = String(formData.get("approvalId") ?? "");
   const decision = String(formData.get("decision") ?? "") as "approved" | "rejected";
+  const recipientEmail = String(formData.get("recipientEmail") ?? "").trim();
   const db = await getDb();
   await resolveApproval(db, approvalId, decision, { resolvedBy: "user" });
+
+  // Approve + recipient on an outreach/follow-up = actually send (guarded layer
+  // still refuses unless ALLOW_EXTERNAL_SEND=true and the domain is live).
+  if (decision === "approved" && recipientEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipientEmail)) {
+    try {
+      const { approvals, followups } = await import("@/lib/db/schema");
+      const { eq } = await import("drizzle-orm");
+      const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
+      const payload = (approval?.payload ?? {}) as {
+        draft?: { subject?: string; body?: string };
+        followupId?: string;
+        opportunityId?: string;
+      };
+      if (
+        approval &&
+        ["send_outreach", "send_followup"].includes(approval.approvalType) &&
+        payload.draft?.subject &&
+        payload.draft?.body
+      ) {
+        const { sendExternal } = await import("@/lib/outbound/send");
+        await sendExternal(db, approvalId, {
+          channel: "email",
+          to: recipientEmail,
+          subject: payload.draft.subject,
+          body: payload.draft.body,
+          opportunityId: payload.opportunityId,
+        });
+        if (payload.followupId) {
+          await db
+            .update(followups)
+            .set({ status: "sent", updatedAt: new Date() })
+            .where(eq(followups.id, payload.followupId));
+        }
+      }
+    } catch (err) {
+      // Sending blocked (env off / domain unverified / no adapter) — approval still stands.
+      console.warn(`[send] approval ${approvalId} approved but send skipped:`, (err as Error).message);
+    }
+  }
   revalidatePath("/approvals");
   revalidatePath("/ploybooks");
   revalidatePath("/");
@@ -101,45 +141,12 @@ export async function submitSignalAction(formData: FormData) {
 export async function pursueOpportunityAction(formData: FormData) {
   const opportunityId = String(formData.get("opportunityId") ?? "");
   const db = await getDb();
-  const { opportunities, accounts, projects } = await import("@/lib/db/schema");
-  const { eq } = await import("drizzle-orm");
-  const opp = await db.query.opportunities.findFirst({
-    where: eq(opportunities.id, opportunityId),
-  });
-  if (!opp) return;
-  const account = opp.accountId
-    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
-    : null;
-  const project = opp.projectId
-    ? await db.query.projects.findFirst({ where: eq(projects.id, opp.projectId) })
-    : null;
-  if (!account && !project) return; // nothing to anchor a pursuit on
-
-  const runId = await launchRun(db, {
-    ploybookKey: "pb01_gc_pursuit",
+  const { launchPursuit } = await import("@/lib/actions/pursue");
+  const result = await launchPursuit(db, opportunityId, {
     triggerType: "manual",
-    triggerPayload: {
-      // Owner unknown → PB01's identify-owner step researches who's behind the
-      // project first, then continues (fails visibly if research can't establish it).
-      gcName: account?.name,
-      identifyOwner: !account,
-      website: account?.website ?? undefined,
-      projectName: project?.name,
-      city: project?.city ?? undefined,
-      tradeScope: opp.tradeScope ?? undefined,
-      opportunityId: opp.id,
-    },
-    primaryEntityType: "opportunity",
-    primaryEntityId: opp.id,
     initiatedBy: "user",
   });
-  // Immediate feedback: the card leaves "discovered" right away, which also
-  // prevents a double-click from launching two pursuits.
-  await db
-    .update(opportunities)
-    .set({ stage: "researching", nextAction: "Research running (~5 min)", updatedAt: new Date() })
-    .where(eq(opportunities.id, opp.id));
-  executeInBackground(db, runId);
+  if (result.runId) executeInBackground(db, result.runId);
   revalidatePath("/opportunities");
   revalidatePath("/ploybooks");
   revalidatePath("/approvals");

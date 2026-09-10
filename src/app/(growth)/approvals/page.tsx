@@ -40,12 +40,22 @@ export default async function ApprovalsPage() {
                 {JSON.stringify(a.payload, null, 2)}
               </pre>
             )}
-            <div className="mt-3 flex gap-2">
-              <form action={resolveApprovalAction}>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <form action={resolveApprovalAction} className="flex items-center gap-2">
                 <input type="hidden" name="approvalId" value={a.id} />
                 <input type="hidden" name="decision" value="approved" />
+                {["send_outreach", "send_followup"].includes(a.approvalType) && (
+                  <input
+                    name="recipientEmail"
+                    type="email"
+                    placeholder="Recipient email (verified) — sends on approve"
+                    className="w-72 rounded border border-fog px-2 py-1 text-xs"
+                  />
+                )}
                 <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
-                  Approve
+                  {["send_outreach", "send_followup"].includes(a.approvalType)
+                    ? "Approve (+ send if email given)"
+                    : "Approve"}
                 </button>
               </form>
               <form action={resolveApprovalAction}>

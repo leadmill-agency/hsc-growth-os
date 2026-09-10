@@ -10,6 +10,28 @@ import { eq, isNull, asc, and } from "drizzle-orm";
 type EventRow = typeof events.$inferSelect;
 
 const SUBSCRIPTIONS: Record<string, (db: Db, event: EventRow) => Promise<void>> = {
+  // Auto-pursue (per Rameel 2026-09-10): a discovered opportunity scoring at or
+  // above the threshold gets researched WITHOUT waiting for a click — the human
+  // gate is the Approvals inbox, not the Pursue button. Daily cap bounds cost.
+  "opportunity.discovered": async (db, event) => {
+    if (!event.opportunityId) return;
+    const payload = event.payload as { score?: number; suggestedPloybook?: string };
+    const { autoPursueThreshold, autoPursueDailyCap, autoPursuitsToday, launchPursuit, AUTO_PURSUE_TRIGGER } =
+      await import("@/lib/actions/pursue");
+    if ((payload.score ?? 0) < autoPursueThreshold()) return;
+    if ((await autoPursuitsToday(db)) >= autoPursueDailyCap()) {
+      console.log(`[auto-pursue] daily cap reached — skipping ${event.opportunityId}`);
+      return;
+    }
+    const result = await launchPursuit(db, event.opportunityId, {
+      triggerType: AUTO_PURSUE_TRIGGER,
+      initiatedBy: "system",
+    });
+    if (result.runId) {
+      const { executeRun } = await import("@/lib/ploybooks/runner");
+      await executeRun(db, result.runId);
+    }
+  },
   // Every submitted bid gets a follow-up plan until the outcome is known (PB13).
   "bid.submitted": async (db, event) => {
     if (!event.bidId) return;

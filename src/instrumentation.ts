@@ -6,6 +6,17 @@
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  // Outbound email adapter (htxsigncrafters.com via Resend). Registering the
+  // adapter does NOT enable sending — the guarded layer still requires
+  // ALLOW_EXTERNAL_SEND=true and an approved, unused approval per message.
+  try {
+    const { registerResendAdapterIfConfigured } = await import("@/lib/outbound/resend-adapter");
+    if (registerResendAdapterIfConfigured()) console.log("[outbound] Resend adapter registered");
+  } catch (err) {
+    console.error("[outbound] adapter registration failed:", err);
+  }
+
   if (process.env.ENABLE_SCHEDULER !== "true") return;
 
   // Boot sweep: a fresh process means every "running" run died with the old one

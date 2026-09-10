@@ -204,6 +204,55 @@ describe("Harvey Golden Path", () => {
     expect(owner.accountType).toBe("property_owner");
   });
 
+  it("auto-pursues high-scoring discoveries via the event subscription (threshold + daily cap respected)", async () => {
+    const { processEvents } = await import("@/lib/events/subscriptions");
+    process.env.AUTO_PURSUE_THRESHOLD = "75";
+    process.env.AUTO_PURSUE_DAILY_CAP = "1";
+    setLLMClientForTests(
+      new FixtureLLMClient({
+        structured: (prompt: string) => {
+          if (prompt.includes("SIGNAL:")) return harveySignalParse; // score 84 ≥ 75
+          if (prompt.includes("account research brief")) return harveyBrief;
+          if (prompt.includes("Build the stakeholder map")) return harveyStakeholderPlan;
+          if (prompt.includes("Draft the bid-access email")) return harveyOutreachDraft;
+          throw new Error(`No fixture: ${prompt.slice(0, 50)}`);
+        },
+      })
+    );
+    // Radar discovers a high scorer…
+    const radarRun = await launchRun(db, {
+      ploybookKey: "pb05_opportunity_radar",
+      triggerPayload: { signalText: harveySignalText, source: "tdlr" },
+    });
+    await executeRun(db, radarRun);
+    // …and the scheduler's event pass auto-pursues it without any click.
+    await processEvents(db);
+    const [opp] = await db.select().from(opportunities);
+    expect(opp.stage).toBe("researching"); // pursuit started with zero clicks
+    const pending = await db.query.approvals.findFirst({
+      where: eq(approvals.approvalType, "send_outreach"),
+    });
+    expect(pending).toBeTruthy(); // the draft is already waiting in Approvals
+
+    // Cap = 1: a second high scorer today is NOT auto-pursued
+    setLLMClientForTests(
+      new FixtureLLMClient({
+        structured: () => ({ ...harveySignalParse, company_name: "Second GC", project_name: "Second Project" }),
+      })
+    );
+    const radar2 = await launchRun(db, {
+      ploybookKey: "pb05_opportunity_radar",
+      triggerPayload: { signalText: "Second signal text", source: "tdlr" },
+    });
+    await executeRun(db, radar2);
+    await processEvents(db);
+    const all = await db.select().from(opportunities);
+    const second = all.find((o) => o.name.includes("Second"));
+    expect(second?.stage).toBe("discovered"); // capped — stays for manual Pursue
+    delete process.env.AUTO_PURSUE_THRESHOLD;
+    delete process.env.AUTO_PURSUE_DAILY_CAP;
+  });
+
   it("fails visibly when owner identification can't establish a company", async () => {
     setLLMClientForTests(
       new FixtureLLMClient({
