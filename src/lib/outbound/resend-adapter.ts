@@ -14,11 +14,13 @@ export function registerResendAdapterIfConfigured(): boolean {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: `Rameel at Houston Sign Crafters <${fromEmail}>`,
+        // ray@htxsigncrafters.com is a real Google Workspace inbox — replies land
+        // there naturally (domain root MX is Google's; Resend sends via the
+        // `send` subdomain, so the two coexist).
+        from: `Ray at Houston Sign Crafters <${fromEmail}>`,
         to: [message.to],
         subject: message.subject,
         text: message.body,
-        reply_to: "sales@houstonsigncrafters.com",
       }),
     });
     if (!res.ok) {
