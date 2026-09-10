@@ -5,6 +5,7 @@ import { getLLMClient } from "@/lib/ai/client";
 import { ingestBidFolder, type IngestedDoc } from "@/lib/documents/ingest";
 import { saveEvidence } from "@/lib/actions/entities";
 import { emitEvent, logActivity } from "@/lib/events";
+import { bids } from "@/lib/db/schema";
 
 // PB11 — Bid Package Analyzer: read the package, produce the estimator brief for Jamal.
 // Trigger payload: { folderPath, bidId?, projectId?, opportunityId?, projectName? }
@@ -120,7 +121,35 @@ export const pb11BidAnalyzer: PloybookDefinition = {
         const ingested = ctx.priorOutputs["ingest_documents"];
         const relevant = (ingested.relevant as IngestedDoc[]).slice(0, MAX_RELEVANT_DOCS);
         if (relevant.length === 0) {
-          return { kind: "skipped", reason: "No signage/awning-relevant documents found" };
+          // Dead-ending silently made the upload look broken (Wingbay permit
+          // set, 2026-09-10): say ON THE BID CARD what happened and what to do.
+          const p = ctx.triggerPayload as { bidId?: string };
+          const lowQuality = (ingested.lowQualityFiles as string[]) ?? [];
+          const total = (ingested.totalIngested as number) ?? 0;
+          const verdict =
+            total > 0 && lowQuality.length === total
+              ? `Analyzer read ${total} file(s) but none had machine-readable text — likely scanned drawings/plan sheets. ` +
+                `Upload the text documents (invite email, specs, scope sheets) to analyze, or take off manually.`
+              : `Analyzer read ${total} file(s) but found no signage/awning-relevant content. ` +
+                `If signs are in this package, upload the specific spec/drawing index files.`;
+          if (p.bidId) {
+            const { eq, sql } = await import("drizzle-orm");
+            await ctx.db
+              .update(bids)
+              .set({
+                notes: sql`coalesce(${bids.notes} || ' — ', '') || ${verdict}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(bids.id, p.bidId));
+            await logActivity(ctx.db, {
+              entityType: "bid",
+              entityId: p.bidId,
+              action: "bid.package_unreadable",
+              detail: verdict,
+              ploybookRunId: ctx.runId,
+            });
+          }
+          return { kind: "skipped", reason: verdict };
         }
         let corpus = "";
         for (const doc of relevant) {
