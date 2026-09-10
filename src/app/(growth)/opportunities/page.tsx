@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db/client";
 import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { submitSignalAction, pursueOpportunityAction, pullTdlrAction } from "@/app/actions";
+import { autoPursueDailyCap } from "@/lib/actions/pursue";
 
 export const dynamic = "force-dynamic";
 
@@ -152,8 +153,8 @@ export default async function OpportunitiesPage({
         morning (~7am) from TDLR construction filings (39 counties, ~150 mi around Houston),
         Houston certificates of occupancy, and a web scan for franchise expansions, new
         developments, and multi-location operators — ranked best-first. Scores of 75+ research
-        themselves, best-first up to a daily budget (currently 25); their outreach drafts land
-        in Approvals. <span className="font-semibold">Pursue</span> starts that same research
+        themselves up to a daily budget (currently {autoPursueDailyCap()}/day — anything over
+        waits its turn tomorrow); their outreach drafts land in Approvals. <span className="font-semibold">Pursue</span> starts that same research
         (~5 min) on anything the budget didn&apos;t reach;{" "}
         <span className="font-semibold">the drafts never send without you.</span>
       </div>
