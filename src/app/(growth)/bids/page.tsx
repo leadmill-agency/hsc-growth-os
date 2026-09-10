@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db/client";
-import { bids, opportunities, accounts } from "@/lib/db/schema";
-import { desc, inArray } from "drizzle-orm";
+import { bids, opportunities, accounts, evidence } from "@/lib/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   runBidQaAction,
   uploadBidPackageAction,
@@ -23,6 +23,132 @@ const statusStyle: Record<string, string> = {
   passed: "bg-cloud text-steel",
 };
 
+// The PB11 estimator brief, rendered where Jamal works instead of buried in
+// evidence records (per Rameel 2026-09-10).
+interface BriefItem {
+  item: string;
+  description: string;
+  fabrication: string;
+  sheet_or_spec_refs: string[];
+  quantity_note: string | null;
+  confidence: number;
+}
+interface EstimatorBrief {
+  documentsIngested?: number;
+  inHouseItems: BriefItem[];
+  supplierFabItems: BriefItem[];
+  unclearItems: BriefItem[];
+  exclusionsToState: string[];
+  riskFlags: { flag: string; source_ref: string | null }[];
+  rfisNeeded: string[];
+  addendumChanges: string[];
+  unknowns: string[];
+  scopeReadVisually?: boolean;
+  verificationNote: string;
+}
+
+function humanize(s: string): string {
+  return s.replaceAll("_", " ");
+}
+
+function BriefItems({ title, items }: { title: string; items: BriefItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-steel">{title}</div>
+      <ul className="mt-1 space-y-1.5">
+        {items.map((it, i) => (
+          <li key={i} className="text-sm">
+            <span className="font-medium">{it.item}</span>
+            <span className="text-steel"> — {it.description}</span>
+            <div className="text-xs text-steel">
+              {it.sheet_or_spec_refs.length > 0 && <>sheets: {it.sheet_or_spec_refs.join(", ")} · </>}
+              qty: {it.quantity_note ?? "not stated in documents"} · confidence{" "}
+              {Math.round(it.confidence * 100)}%
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BriefView({ brief, open }: { brief: EstimatorBrief; open: boolean }) {
+  const itemCount =
+    brief.inHouseItems.length + brief.supplierFabItems.length + brief.unclearItems.length;
+  return (
+    <details open={open} className="mt-3 rounded-lg border border-fog bg-cloud/50 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-ink-700">
+        Estimator brief — {itemCount} scope item{itemCount === 1 ? "" : "s"},{" "}
+        {brief.riskFlags.length} risk{brief.riskFlags.length === 1 ? "" : "s"},{" "}
+        {brief.rfisNeeded.length} RFI{brief.rfisNeeded.length === 1 ? "" : "s"}
+        {brief.scopeReadVisually && (
+          <span className="ml-2 rounded bg-signal px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+            read from drawings
+          </span>
+        )}
+      </summary>
+      <div className="mt-3 space-y-3">
+        <BriefItems title="Build in-house" items={brief.inHouseItems} />
+        <BriefItems title="Buy from suppliers (RFQ)" items={brief.supplierFabItems} />
+        <BriefItems title="Unclear — decide who builds" items={brief.unclearItems} />
+        {brief.riskFlags.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-steel">Risks</div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+              {brief.riskFlags.map((r, i) => (
+                <li key={i}>
+                  {humanize(r.flag)}
+                  {r.source_ref && <span className="text-xs text-steel"> ({r.source_ref})</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {brief.rfisNeeded.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+              Ask the GC (RFIs)
+            </div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+              {brief.rfisNeeded.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {brief.exclusionsToState.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+              State as excluded
+            </div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+              {brief.exclusionsToState.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {brief.unknowns.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+              Still unknown
+            </div>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-steel">
+              {brief.unknowns.map((u, i) => (
+                <li key={i}>{u}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="border-t border-fog pt-2 text-xs font-medium text-amber-800">
+          {brief.verificationNote}
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function daysLeft(due: Date | null): { label: string; urgent: boolean } {
   if (!due) return { label: "no due date", urgent: false };
   const days = Math.ceil((due.getTime() - Date.now()) / 86400000);
@@ -44,6 +170,22 @@ export default async function BidsPage() {
     ? await db.query.accounts.findMany({ where: inArray(accounts.id, accountIds) })
     : [];
   const accountById = new Map(accts.map((a) => [a.id, a]));
+
+  const bidIds = rows.map((b) => b.id);
+  const briefRows = bidIds.length
+    ? await db.query.evidence.findMany({
+        where: and(
+          eq(evidence.entityType, "bid"),
+          eq(evidence.fieldName, "estimator_brief"),
+          inArray(evidence.entityId, bidIds)
+        ),
+        orderBy: desc(evidence.retrievedAt),
+      })
+    : [];
+  const briefByBid = new Map<string, EstimatorBrief>();
+  for (const row of briefRows) {
+    if (!briefByBid.has(row.entityId)) briefByBid.set(row.entityId, row.value as EstimatorBrief);
+  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -117,6 +259,7 @@ export default async function BidsPage() {
           const account = opp?.accountId ? accountById.get(opp.accountId) : null;
           const due = daysLeft(bid.dueAt);
           const active = !["won", "lost", "passed", "cancelled"].includes(bid.status);
+          const brief = briefByBid.get(bid.id);
           return (
             <div key={bid.id} className="rounded-lg border border-fog bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -162,6 +305,8 @@ export default async function BidsPage() {
                   </div>
                 )}
               </div>
+
+              {brief && <BriefView brief={brief} open={bid.status === "estimating"} />}
 
               {/* Record what actually happened — "submitted" starts the Day-2/7/14/30
                   follow-ups, won/lost close the loop (and cancel pending follow-ups). */}
