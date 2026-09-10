@@ -88,22 +88,30 @@ export async function resolveApprovalAction(formData: FormData) {
       const { eq } = await import("drizzle-orm");
       const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
       const payload = (approval?.payload ?? {}) as {
-        draft?: { subject?: string; body?: string };
+        draft?: { subject?: string; body?: string; alternate_subject?: string; alternate_body?: string };
         followupId?: string;
         opportunityId?: string;
       };
+      // The card offers Version A/B — the selected version is what sends.
+      const useAlternate =
+        String(formData.get("draftVersion") ?? "primary") === "alternate" &&
+        !!payload.draft?.alternate_body;
+      const subject = useAlternate
+        ? (payload.draft?.alternate_subject ?? payload.draft?.subject)
+        : payload.draft?.subject;
+      const body = useAlternate ? payload.draft?.alternate_body : payload.draft?.body;
       if (
         approval &&
         ["send_outreach", "send_followup"].includes(approval.approvalType) &&
-        payload.draft?.subject &&
-        payload.draft?.body
+        subject &&
+        body
       ) {
         const { sendExternal } = await import("@/lib/outbound/send");
         await sendExternal(db, approvalId, {
           channel: "email",
           to: recipientEmail,
-          subject: payload.draft.subject,
-          body: payload.draft.body,
+          subject,
+          body,
           opportunityId: payload.opportunityId,
         });
         if (payload.followupId) {

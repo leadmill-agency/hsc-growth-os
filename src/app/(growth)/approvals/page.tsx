@@ -44,6 +44,120 @@ const sourceLabels: Record<string, string> = {
   bid_package: "an uploaded bid package",
 };
 
+// Typed, readable payload views (per Rameel 2026-09-10: "this isn't written in
+// normal human language"). Raw JSON stays available behind a details toggle.
+
+interface EmailDraft {
+  subject?: string;
+  body?: string;
+  alternate_subject?: string;
+  alternate_body?: string;
+  target_contact?: string;
+  rationale?: string;
+}
+
+function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFormId: string }) {
+  const hasAlternate = !!draft.alternate_body;
+  return (
+    <div className="mt-2 space-y-2">
+      {draft.target_contact && (
+        <p className="text-sm">
+          <span className="font-medium">To:</span> {draft.target_contact}{" "}
+          <span className="text-xs text-steel">— paste their verified email below to send</span>
+        </p>
+      )}
+      <label className="block cursor-pointer rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
+        <div className="flex items-center gap-2 text-xs font-semibold text-ink-700">
+          {hasAlternate && (
+            <input type="radio" name="draftVersion" value="primary" defaultChecked form={approveFormId} />
+          )}
+          {hasAlternate ? "Version A" : "The email"}
+        </div>
+        <div className="mt-1.5 text-sm font-medium">{draft.subject}</div>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{draft.body}</p>
+      </label>
+      {hasAlternate && (
+        <label className="block cursor-pointer rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
+          <div className="flex items-center gap-2 text-xs font-semibold text-ink-700">
+            <input type="radio" name="draftVersion" value="alternate" form={approveFormId} />
+            Version B — pick one; the selected version is what sends
+          </div>
+          <div className="mt-1.5 text-sm font-medium">{draft.alternate_subject ?? draft.subject}</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{draft.alternate_body}</p>
+        </label>
+      )}
+      {draft.rationale && <p className="text-xs text-steel">Why written this way: {draft.rationale}</p>}
+    </div>
+  );
+}
+
+interface ParsedInvite {
+  gc_name?: string | null;
+  project_name?: string | null;
+  project_address?: string | null;
+  city?: string | null;
+  scope_summary?: string;
+  bid_due?: string | null;
+  submission_method?: string | null;
+  supplier_fab_items_expected?: string[];
+  service_area?: string;
+  unknowns?: string[];
+}
+
+const serviceAreaLabels: Record<string, string> = {
+  houston_metro: "Houston metro — full service",
+  texas_outside_houston: "Texas, outside the metro — canopies/awnings only",
+  outside_texas: "Outside Texas — out of service area",
+  unknown: "location unclear",
+};
+
+function BidInviteView({ parsed }: { parsed: ParsedInvite }) {
+  const rows: [string, string | null | undefined][] = [
+    ["General contractor", parsed.gc_name],
+    ["Project", parsed.project_name],
+    ["Where", [parsed.project_address, parsed.city].filter(Boolean).join(", ") || null],
+    ["Service area", parsed.service_area ? (serviceAreaLabels[parsed.service_area] ?? parsed.service_area) : null],
+    ["Bid due", parsed.bid_due ? parsed.bid_due.slice(0, 16).replace("T", " at ") : "not stated"],
+    ["Submit via", parsed.submission_method ?? "not stated"],
+    [
+      "Supplier-fab items (awnings/canopies/backlit)",
+      parsed.supplier_fab_items_expected?.length ? parsed.supplier_fab_items_expected.join(", ") : "none named",
+    ],
+  ];
+  return (
+    <div className="mt-2 space-y-1 rounded-lg border border-fog bg-cloud/40 p-3 text-sm">
+      {rows
+        .filter(([, v]) => v)
+        .map(([k, v]) => (
+          <div key={k}>
+            <span className="font-medium">{k}:</span> <span className="text-ink-700">{v}</span>
+          </div>
+        ))}
+      {parsed.unknowns && parsed.unknowns.length > 0 && (
+        <div className="pt-1 text-xs text-steel">
+          Still unknown: {parsed.unknowns.join(" · ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RfqListView({ rfqs }: { rfqs: { supplier_category?: string; subject?: string; body?: string }[] }) {
+  return (
+    <div className="mt-2 space-y-2">
+      {rfqs.map((r, i) => (
+        <div key={i} className="rounded-lg border border-fog bg-cloud/40 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+            To a {r.supplier_category ?? "supplier"}
+          </div>
+          <div className="mt-1 text-sm font-medium">{r.subject}</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{r.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function ApprovalsPage() {
   const db = await getDb();
   const pending = await db.query.approvals.findMany({
@@ -109,13 +223,35 @@ export default async function ApprovalsPage() {
                 <span className="font-medium">Proposed:</span> {a.proposedAction}
               </p>
             )}
+            {(() => {
+              const payload = (a.payload ?? {}) as {
+                draft?: EmailDraft;
+                parsed?: ParsedInvite;
+                rfqs?: { supplier_category?: string; subject?: string; body?: string }[];
+              };
+              if (["send_outreach", "send_followup"].includes(a.approvalType) && payload.draft) {
+                return <EmailDraftView draft={payload.draft} approveFormId={`approve-${a.id}`} />;
+              }
+              if (a.approvalType === "accept_bid" && payload.parsed) {
+                return <BidInviteView parsed={payload.parsed} />;
+              }
+              if (a.approvalType === "send_supplier_rfqs" && payload.rfqs?.length) {
+                return <RfqListView rfqs={payload.rfqs} />;
+              }
+              return null;
+            })()}
             {Object.keys((a.payload ?? {}) as object).length > 0 && (
-              <pre className="mt-2 overflow-x-auto rounded bg-cloud p-2 text-xs text-steel">
-                {JSON.stringify(a.payload, null, 2)}
-              </pre>
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs text-steel/70 hover:text-signal">
+                  Raw data (for debugging)
+                </summary>
+                <pre className="mt-1 overflow-x-auto rounded bg-cloud p-2 text-xs text-steel">
+                  {JSON.stringify(a.payload, null, 2)}
+                </pre>
+              </details>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <form action={resolveApprovalAction} className="flex items-center gap-2">
+              <form action={resolveApprovalAction} id={`approve-${a.id}`} className="flex items-center gap-2">
                 <input type="hidden" name="approvalId" value={a.id} />
                 <input type="hidden" name="decision" value="approved" />
                 {["send_outreach", "send_followup"].includes(a.approvalType) && (
