@@ -52,6 +52,7 @@ export async function launchPloybookAction(formData: FormData) {
   executeInBackground(db, runId);
   revalidatePath("/ploybooks");
   revalidatePath("/approvals");
+  revalidatePath("/bids");
   revalidatePath("/");
 }
 
@@ -220,11 +221,70 @@ export async function analyzeBidAction(formData: FormData) {
   revalidatePath("/ploybooks");
 }
 
+// Standalone bid-desk entry (per Rameel: "when looking at bids, i dont see a place
+// where i can upload zip files") — no pre-existing bid row required. Creates the
+// minimal opportunity + bid, then runs the same upload→analyze path.
+export async function startBidFromPackageAction(formData: FormData) {
+  const projectName = String(formData.get("projectName") ?? "").trim();
+  const dueDate = String(formData.get("dueDate") ?? "").trim();
+  const file = formData.get("package");
+  if (!projectName || !(file instanceof File) || !file.name.toLowerCase().endsWith(".zip")) return;
+  const db = await getDb();
+  const { bids } = await import("@/lib/db/schema");
+  const { createOpportunity } = await import("@/lib/actions/entities");
+  const { opportunity } = await createOpportunity(db, {
+    name: projectName,
+    opportunityType: "bid",
+    stage: "bidding",
+    source: "bid_package",
+    sourceDetail: "uploaded bid package",
+    actor: "user",
+  });
+  const [bid] = await db
+    .insert(bids)
+    .values({
+      opportunityId: opportunity.id,
+      status: "estimating",
+      dueAt: dueDate ? new Date(`${dueDate}T12:00:00Z`) : null,
+      notes: `Created from uploaded package: ${file.name}`,
+    })
+    .returning();
+  const uploadForm = new FormData();
+  uploadForm.set("bidId", bid.id);
+  uploadForm.set("package", file);
+  await uploadBidPackageAction(uploadForm);
+  revalidatePath("/bids");
+}
+
 export async function pullTdlrAction() {
   const db = await getDb();
   const { runTdlrPull } = await import("@/lib/integrations/tdlr/runner");
   void runTdlrPull(db).catch((err) => console.error("[tdlr] manual pull failed:", err));
   revalidatePath("/opportunities");
+}
+
+const accountPloybooks: Record<string, { key: string; field: string }> = {
+  swarm: { key: "pb06_company_swarm", field: "accountName" },
+  abm_page: { key: "pb07_abm_page", field: "accountName" },
+  research: { key: "pb09_account_research", field: "accountName" },
+};
+
+export async function launchAccountPloybookAction(formData: FormData) {
+  const accountName = String(formData.get("accountName") ?? "").trim();
+  const which = String(formData.get("which") ?? "");
+  const config = accountPloybooks[which];
+  if (!accountName || !config) return;
+  const db = await getDb();
+  const runId = await launchRun(db, {
+    ploybookKey: config.key,
+    triggerType: "manual",
+    triggerPayload: { [config.field]: accountName },
+    initiatedBy: "user",
+  });
+  executeInBackground(db, runId);
+  revalidatePath("/accounts");
+  revalidatePath("/ploybooks");
+  revalidatePath("/approvals");
 }
 
 export async function createAccountAction(formData: FormData) {

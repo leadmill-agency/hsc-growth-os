@@ -1,7 +1,12 @@
 import { getDb } from "@/lib/db/client";
 import { bids, opportunities, accounts } from "@/lib/db/schema";
 import { desc, inArray } from "drizzle-orm";
-import { runBidQaAction, uploadBidPackageAction } from "@/app/actions";
+import {
+  runBidQaAction,
+  uploadBidPackageAction,
+  startBidFromPackageAction,
+  launchPloybookAction,
+} from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +48,67 @@ export default async function BidsPage() {
     <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-semibold">Bids</h1>
       <p className="text-sm text-steel">
-        Every tracked bid. New ones arrive via PB10 (paste an invite on the Ploybooks page).
-        Follow-ups start automatically once a bid is recorded as submitted.
+        Every tracked bid, with two ways to start one below. Once a bid is marked submitted,
+        Day-2/7/14/30 follow-ups draft themselves automatically.
       </p>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <form
+          action={startBidFromPackageAction}
+          className="space-y-2 rounded-lg border border-fog bg-white p-4"
+        >
+          <div className="text-sm font-semibold">Upload a bid package (.zip)</div>
+          <p className="text-xs text-steel">
+            Drop the plans/specs zip from PlanHub or a GC email. The analyzer reads every
+            document and builds the estimator brief: sign scope, quantities, due dates, and
+            what&apos;s missing.
+          </p>
+          <input
+            name="projectName"
+            required
+            placeholder="Project name (e.g. Katy Grand Retail Phase 2)"
+            className="w-full rounded border border-fog px-2 py-1 text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-steel">
+              Due
+              <input type="date" name="dueDate" className="rounded border border-fog px-2 py-1 text-xs" />
+            </label>
+            <input
+              type="file"
+              name="package"
+              accept=".zip"
+              required
+              className="min-w-0 flex-1 text-xs text-steel file:mr-2 file:rounded file:border-0 file:bg-cloud file:px-2 file:py-1 file:text-xs file:font-medium file:text-ink-700"
+            />
+          </div>
+          <button className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
+            Upload + analyze
+          </button>
+        </form>
+
+        <form
+          action={launchPloybookAction}
+          className="space-y-2 rounded-lg border border-fog bg-white p-4"
+        >
+          <input type="hidden" name="ploybookKey" value="pb10_incoming_bid" />
+          <div className="text-sm font-semibold">Paste a bid invite</div>
+          <p className="text-xs text-steel">
+            Paste the invite email or PlanHub notice. The system extracts the GC, project, scope,
+            and due date, creates the bid card, and drafts the acknowledgment.
+          </p>
+          <textarea
+            name="input"
+            required
+            rows={4}
+            placeholder="Paste the full invitation text here…"
+            className="w-full rounded border border-fog px-2 py-1 text-sm"
+          />
+          <button className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
+            Create bid from invite
+          </button>
+        </form>
+      </div>
 
       <div className="space-y-3">
         {rows.map((bid) => {

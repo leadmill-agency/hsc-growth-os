@@ -25,10 +25,28 @@ const nextActionLabels: Record<string, string> = {
   "Identify owner/GC first (research)": "Identify owner/GC first",
 };
 
+const sourceLabels: Record<string, string> = {
+  tdlr: "TDLR filing",
+  coh_co: "New CO (business moving in)",
+  web_scout: "Web scout",
+  manual_signal: "Pasted signal",
+  website_intent: "Website visitor",
+  pb01: "GC pursuit",
+  pb02: "Development",
+  pb03: "Franchise rollout",
+  pb04: "Portfolio",
+  radar: "Radar",
+};
+
 export default async function OpportunitiesPage() {
   const db = await getDb();
+  const { sql } = await import("drizzle-orm");
+  // Best first (per Rameel): score desc, newest breaks ties.
   const rows = await db.query.opportunities.findMany({
-    orderBy: desc(opportunities.createdAt),
+    orderBy: [
+      desc(sql`coalesce(${opportunities.overallScore}, ${opportunities.fitScore}, -1)`),
+      desc(opportunities.createdAt),
+    ],
     limit: 100,
   });
 
@@ -60,9 +78,19 @@ export default async function OpportunitiesPage() {
         <h1 className="text-xl font-semibold">Opportunities</h1>
         <form action={pullTdlrAction}>
           <button className="rounded border border-fog bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-signal">
-            Pull TDLR filings now
+            Pull filings now
           </button>
         </form>
+      </div>
+
+      <div className="rounded-lg border border-fog bg-cloud px-4 py-3 text-sm text-ink-700">
+        <span className="font-semibold">How this works:</span> refreshed automatically every
+        morning (~7am) from TDLR construction filings, Houston certificates of occupancy, and a
+        web scan for franchise expansions, new developments, and multi-location operators —
+        ranked best-first. Scores of 75+ research themselves and their outreach drafts land in
+        Approvals. <span className="font-semibold">Pursue</span> starts that same research
+        (~5 min) on anything below the line; <span className="font-semibold">the drafts never
+        send without you.</span>
       </div>
 
       <form
@@ -125,7 +153,7 @@ export default async function OpportunitiesPage() {
                         project ~${projectValue.toLocaleString()}
                       </span>
                     )}
-                    {o.source && <span>via {o.source}</span>}
+                    {o.source && <span>{sourceLabels[o.source] ?? o.source}</span>}
                   </div>
                   {why && <p className="mt-2 text-sm text-ink-700">{why}</p>}
                 </div>

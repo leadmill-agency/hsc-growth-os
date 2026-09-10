@@ -1,41 +1,37 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db/client";
-import {
-  accounts,
-  opportunities,
-  ploybookRuns,
-  approvals,
-  activities,
-  evidence,
-} from "@/lib/db/schema";
+import { opportunities, ploybookRuns, approvals, followups, evidence } from "@/lib/db/schema";
 import { and, count, desc, eq } from "drizzle-orm";
-import { resolveApprovalAction } from "@/app/actions";
 import type { WeeklyBrief } from "@/lib/ploybooks/pb18-growth-operator/definition";
 
 export const dynamic = "force-dynamic";
 
-// §15.1 Home — Growth Command Center: KPI strip, Needs You, Agents Running, activity.
+// Home = "what should I do right now?" (per Rameel 2026-09-10). Three blocks:
+// 1) Do now — the things waiting on a human, 2) Today's brief in plain English,
+// 3) shortcuts. Raw activity history lives on /history, not here.
 
 export default async function Home() {
   const db = await getDb();
-  const [accountCount] = await db.select({ n: count() }).from(accounts);
-  const [oppCount] = await db.select({ n: count() }).from(opportunities);
   const pendingApprovals = await db.query.approvals.findMany({
     where: eq(approvals.status, "pending"),
     orderBy: desc(approvals.requestedAt),
-    limit: 10,
+    limit: 5,
   });
-  const runningRuns = await db.query.ploybookRuns.findMany({
+  const [pendingCount] = await db
+    .select({ n: count() })
+    .from(approvals)
+    .where(eq(approvals.status, "pending"));
+  const [draftedFollowups] = await db
+    .select({ n: count() })
+    .from(followups)
+    .where(eq(followups.status, "drafted"));
+  const [decisionsWaiting] = await db
+    .select({ n: count() })
+    .from(opportunities)
+    .where(eq(opportunities.stage, "discovered"));
+  const running = await db.query.ploybookRuns.findMany({
     where: eq(ploybookRuns.status, "running"),
-    limit: 10,
-  });
-  const waitingRuns = await db.query.ploybookRuns.findMany({
-    where: eq(ploybookRuns.status, "waiting_for_approval"),
-    limit: 10,
-  });
-  const recentActivity = await db.query.activities.findMany({
-    orderBy: desc(activities.occurredAt),
-    limit: 15,
+    limit: 5,
   });
   const briefRow = await db.query.evidence.findFirst({
     where: and(eq(evidence.entityType, "system"), eq(evidence.fieldName, "weekly_brief")),
@@ -43,143 +39,114 @@ export default async function Home() {
   });
   const brief = (briefRow?.value ?? null) as WeeklyBrief | null;
 
+  const todo: { label: string; detail: string; href: string; urgent: boolean }[] = [];
+  if (pendingCount.n > 0) {
+    todo.push({
+      label: `Review ${pendingCount.n} item${pendingCount.n === 1 ? "" : "s"} waiting for your approval`,
+      detail: pendingApprovals.map((a) => a.title).slice(0, 3).join(" · "),
+      href: "/approvals",
+      urgent: true,
+    });
+  }
+  if (draftedFollowups.n > 0) {
+    todo.push({
+      label: `${draftedFollowups.n} bid follow-up${draftedFollowups.n === 1 ? "" : "s"} drafted and ready to send`,
+      detail: "Open each one, add the GC's email, approve to send",
+      href: "/approvals",
+      urgent: true,
+    });
+  }
+  if (decisionsWaiting.n > 0) {
+    todo.push({
+      label: `${decisionsWaiting.n} new opportunit${decisionsWaiting.n === 1 ? "y" : "ies"} need a yes/no`,
+      detail: "High scorers research themselves — these are the ones waiting on your judgment",
+      href: "/opportunities",
+      urgent: false,
+    });
+  }
+
   return (
-    <div className="max-w-4xl space-y-8">
-      <h1 className="text-xl font-semibold">Growth Command Center</h1>
+    <div className="max-w-3xl space-y-8">
+      <h1 className="text-xl font-semibold">Today</h1>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-ink-700">Do now</h2>
+        {todo.length === 0 ? (
+          <p className="rounded-lg border border-fog bg-white p-4 text-sm text-steel">
+            Nothing waiting on you. The radar pulls new opportunities every morning — check back
+            after ~7:30am, or browse <Link href="/opportunities" className="underline">Opportunities</Link>.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {todo.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`block rounded-lg border p-4 hover:border-signal ${
+                  item.urgent ? "border-amber-300 bg-amber-50" : "border-fog bg-white"
+                }`}
+              >
+                <div className="font-semibold">{item.label}</div>
+                <div className="mt-0.5 text-sm text-steel">{item.detail}</div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
       {brief && (
         <section className="rounded-lg border border-fog bg-white p-5">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-sm font-semibold">This week: {brief.headline}</h2>
-            <span className="text-xs text-steel">
-              {brief.generatedAt?.slice(0, 10)} · PB18
-            </span>
+            <h2 className="text-sm font-semibold">Today's brief</h2>
+            <span className="text-xs text-steel">{brief.generatedAt?.slice(0, 10)}</span>
           </div>
+          <p className="mt-2 font-medium text-ink">{brief.headline}</p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-700">
             {brief.what_changed.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {brief.recommendations.length > 0 && (
-            <div className="mt-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-steel">
-                Recommended this week
-              </div>
-              <ol className="mt-2 space-y-1.5 text-sm">
-                {[...brief.recommendations]
-                  .sort((a, b) => a.priority - b.priority)
-                  .slice(0, 5)
-                  .map((rec) => (
-                    <li key={rec.action} className="flex items-start gap-2">
-                      <span className="mt-0.5 rounded bg-signal px-1.5 text-xs font-bold text-white">
-                        {rec.priority}
-                      </span>
-                      <span>
-                        <span className="font-medium">{rec.action}</span>
-                        <span className="text-steel">
-                          {" "}
-                          — {rec.reason}
-                          {rec.ploybook_key ? ` (run ${rec.ploybook_key.split("_")[0].toUpperCase()} on Ploybooks)` : ""}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-              </ol>
-            </div>
-          )}
-          {brief.watchouts.length > 0 && (
-            <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Watch: {brief.watchouts.join(" · ")}
-            </p>
+            <ol className="mt-4 space-y-2 text-sm">
+              {[...brief.recommendations]
+                .sort((a, b) => a.priority - b.priority)
+                .slice(0, 4)
+                .map((rec, i) => (
+                  <li key={rec.action} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 rounded bg-signal px-1.5 text-xs font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="font-medium">{rec.action}</span>
+                      <span className="text-steel"> — {rec.reason}</span>
+                    </span>
+                  </li>
+                ))}
+            </ol>
           )}
         </section>
       )}
 
-      <section className="grid grid-cols-4 gap-4">
-        {[
-          { label: "Accounts", value: accountCount.n },
-          { label: "Opportunities", value: oppCount.n },
-          { label: "Agents running", value: runningRuns.length + waitingRuns.length },
-          { label: "Needs you", value: pendingApprovals.length },
-        ].map((kpi) => (
-          <div key={kpi.label} className="rounded-lg border border-fog bg-white p-4">
-            <div className="text-2xl font-semibold">{kpi.value}</div>
-            <div className="text-xs text-steel">{kpi.label}</div>
-          </div>
-        ))}
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-700">Needs you</h2>
-        {pendingApprovals.length === 0 ? (
-          <p className="text-sm text-steel">No pending approvals.</p>
-        ) : (
-          <div className="space-y-2">
-            {pendingApprovals.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3"
-              >
-                <div>
-                  <div className="text-sm font-medium">{a.title}</div>
-                  {a.summary && <div className="text-xs text-steel">{a.summary}</div>}
-                </div>
-                <div className="flex gap-2">
-                  <form action={resolveApprovalAction}>
-                    <input type="hidden" name="approvalId" value={a.id} />
-                    <input type="hidden" name="decision" value="approved" />
-                    <button className="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white">
-                      Approve
-                    </button>
-                  </form>
-                  <form action={resolveApprovalAction}>
-                    <input type="hidden" name="approvalId" value={a.id} />
-                    <input type="hidden" name="decision" value="rejected" />
-                    <button className="rounded bg-fog px-3 py-1 text-xs font-medium">
-                      Reject
-                    </button>
-                  </form>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-700">Agents running</h2>
-        {runningRuns.length + waitingRuns.length === 0 ? (
-          <p className="text-sm text-steel">
-            Nothing running. Launch one from <Link href="/ploybooks" className="underline">Ploybooks</Link>.
-          </p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {[...runningRuns, ...waitingRuns].map((r) => (
+      {running.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-ink-700">Working in the background</h2>
+          <ul className="space-y-1 text-sm text-steel">
+            {running.map((r) => (
               <li key={r.id}>
                 <Link href={`/runs/${r.id}`} className="underline">
                   {r.ploybookKey}
                 </Link>{" "}
-                — {r.status} {r.currentStep ? `(${r.currentStep})` : ""}
+                — {r.currentStep ?? "starting"} (a few minutes; results land in Approvals or on the cards)
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink-700">Recent activity</h2>
-        <ul className="space-y-1 text-xs text-steel">
-          {recentActivity.map((a) => (
-            <li key={a.id}>
-              <span className="font-mono text-steel/70">
-                {a.occurredAt.toISOString().slice(5, 16).replace("T", " ")}
-              </span>{" "}
-              <span className="font-medium text-ink">{a.action}</span>
-              {a.detail ? ` — ${a.detail}` : ""}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <p className="text-xs text-steel">
+        New to this? Read the <Link href="/guide" className="underline">Guide</Link> (5 minutes).
+        Full system log lives in <Link href="/history" className="underline">History</Link>.
+      </p>
     </div>
   );
 }

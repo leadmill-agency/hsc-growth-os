@@ -11,6 +11,7 @@ const nav = [
   { href: "/ploybooks", label: "Ploybooks" },
   { href: "/approvals", label: "Approvals" },
   { href: "/guide", label: "Guide" },
+  { href: "/history", label: "History" },
 ];
 
 export default function GrowthLayout({ children }: { children: React.ReactNode }) {

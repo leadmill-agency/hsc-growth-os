@@ -73,15 +73,17 @@ export async function register() {
       console.error("[scheduler] follow-up drafting failed:", err);
     }
 
-    // PB18 weekly brief — Monday after Houston morning
+    // PB18 daily brief — every morning after the radar pulls (per Rameel 2026-09-10)
     try {
       const now = new Date();
-      if (now.getUTCDay() === 1 && now.getUTCHours() >= 13) {
-        const { pb18RanThisWeek } = await import("@/lib/ploybooks/pb18-growth-operator/definition");
-        if (!(await pb18RanThisWeek(db))) {
+      if (now.getUTCHours() >= 13) {
+        const { pb18RanToday } = await import("@/lib/ploybooks/pb18-growth-operator/definition");
+        const { tdlrPulledToday } = await import("@/lib/integrations/tdlr/runner");
+        // Brief only after the day's intake has run, so it reports on fresh data
+        if (!(await pb18RanToday(db)) && (await tdlrPulledToday(db))) {
           const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
           await import("@/lib/ploybooks");
-          console.log("[scheduler] running weekly PB18 growth brief");
+          console.log("[scheduler] running daily PB18 growth brief");
           const runId = await launchRun(db, {
             ploybookKey: "pb18_growth_operator",
             triggerType: "scheduled",
@@ -91,7 +93,7 @@ export async function register() {
         }
       }
     } catch (err) {
-      console.error("[scheduler] weekly brief failed:", err);
+      console.error("[scheduler] daily brief failed:", err);
     }
 
     // Daily TDLR + CoH radar pull (after Houston morning)

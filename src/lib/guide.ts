@@ -233,13 +233,13 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
   },
   pb18_growth_operator: {
     key: "pb18_growth_operator",
-    title: "The Monday brief (automatic)",
+    title: "The daily brief (automatic)",
     audience: "Rameel",
     whenToUse:
-      "You don't run this — it runs itself every Monday morning and appears at the top of the Home page. Run it manually only if you want a fresh brief mid-week.",
+      "You don't run this — it runs itself every morning after the day's opportunity pull finishes, and appears at the top of the Home page. Run it manually only if you want a fresh brief later in the day.",
     whatToEnter: "Nothing.",
     whatHappens:
-      "It counts what actually happened this week straight from the database — opportunities by source, bids, pending approvals, follow-ups waiting, page views — and turns it into observations and ranked recommendations.",
+      "It counts what actually happened straight from the database — new opportunities by source, bids, pending approvals, follow-ups waiting, page views — and turns it into plain-English observations and ranked recommendations.",
     whatYouGet:
       "The brief on the Home page. Every recommendation names the playbook to run or the human action to take. The numbers are real; a quiet week says 'quiet week'.",
   },

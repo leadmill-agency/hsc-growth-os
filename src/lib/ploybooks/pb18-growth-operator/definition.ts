@@ -149,6 +149,15 @@ export async function pb18RanThisWeek(db: Db): Promise<boolean> {
   return !!row;
 }
 
+export async function pb18RanToday(db: Db): Promise<boolean> {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const row = await db.query.events.findFirst({
+    where: and(eq(events.eventType, "growth.brief_created"), gte(events.occurredAt, startOfDay)),
+  });
+  return !!row;
+}
+
 export const pb18GrowthOperator: PloybookDefinition = {
   key: "pb18_growth_operator",
   name: "PB18 — Growth Operator",
@@ -173,17 +182,22 @@ export const pb18GrowthOperator: PloybookDefinition = {
         const llm = getLLMClient();
         const brief = await llm.generateStructured({
           system:
-            "You are HSC's weekly growth operator. Turn the metrics JSON into a short brief. " +
-            "RULES: use ONLY the numbers provided — never invent or extrapolate figures; every " +
-            "recommendation must be concretely runnable (name the ploybook_key from: " +
+            "You write the daily brief for the owner of a Houston sign company. He is not " +
+            "technical and will not tolerate robot-speak. HARD RULES ON LANGUAGE: never echo " +
+            "metric variable names (no 'activePursuits', 'topUnactioned', camelCase, or JSON " +
+            "words) — translate everything into plain sentences a business owner says out loud " +
+            "('5 strong leads are waiting for a yes or no', not 'topUnactioned contains 5'). " +
+            "headline: one sentence, the single most important thing today. what_changed: 2-5 " +
+            "short sentences. Each recommendation's action: an imperative sentence that names " +
+            "WHERE to click and WHAT to do ('Open Approvals and approve or reject the 2 waiting " +
+            "drafts'); reason: one sentence on why it matters for revenue. Use ONLY the numbers " +
+            "provided — never invent figures; zeros are worth saying plainly. ploybook_key from: " +
             "pb01_gc_pursuit, pb02_commercial_development, pb03_franchise_expansion, " +
             "pb04_facility_portfolio, pb06_company_swarm, pb07_abm_page, pb09_account_research, " +
-            "pb10_incoming_bid, pb12_bid_qa, pb14_deal_room, pb15_business_case, " +
-            "pb16_local_seo, pb17_content_builder — or null for pure human actions like " +
-            "'clear the approvals inbox' or 'send the drafted follow-ups'); reference specific " +
-            "opportunities from topUnactioned by name; priority 1 is most urgent. Plain " +
-            "English, no hype. If a number is zero, say so plainly — a quiet week is a finding.",
-          prompt: `THIS WEEK'S METRICS:\n${JSON.stringify(metrics, null, 1)}\n\nWrite the brief.`,
+            "pb10_incoming_bid, pb12_bid_qa, pb14_deal_room, pb15_business_case, pb16_local_seo, " +
+            "pb17_content_builder — or null for human actions. Reference opportunities by their " +
+            "plain names.",
+          prompt: `TODAY'S NUMBERS (last 7 days of activity):\n${JSON.stringify(metrics, null, 1)}\n\nWrite the brief.`,
           schema: briefSchema,
           effort: "medium",
         });
