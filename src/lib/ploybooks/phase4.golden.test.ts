@@ -33,6 +33,7 @@ const rtgInviteParse = {
   bid_due: "2026-08-10T14:00:00-05:00",
   submission_method: "bids@cawalker.net",
   signage_awning_relevance: "likely",
+  service_area: "houston_metro",
   supplier_fab_items_expected: ["wall hung canopies"],
   unknowns: ["signage package award structure"],
 };

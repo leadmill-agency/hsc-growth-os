@@ -20,6 +20,9 @@ const inviteParseSchema = z.object({
   submission_method: z.string().nullable(), // email address or portal
   signage_awning_relevance: z.enum(["explicit", "likely", "unclear", "none"]),
   supplier_fab_items_expected: z.array(z.string()), // awnings/canopies/backlit → supplier RFQs
+  // Service-area rule (per Rameel 2026-09-10): canopies/awnings sell statewide,
+  // signage sticks to the Houston metro (~150 mi of downtown).
+  service_area: z.enum(["houston_metro", "texas_outside_houston", "outside_texas", "unknown"]),
   unknowns: z.array(z.string()),
 });
 
@@ -45,7 +48,10 @@ export const pb10IncomingBid: PloybookDefinition = {
             "signage_awning_relevance: 'explicit' only if sign/awning/canopy scope is named; " +
             "ground-up commercial buildings are 'likely' (they almost always carry signage/canopy " +
             "packages). supplier_fab_items_expected: awning/canopy/backlit items HSC buys from " +
-            "suppliers. bid_due as ISO 8601 when a date is stated.",
+            "suppliers. service_area from the project location: houston_metro = within ~150 " +
+            "miles of downtown Houston (includes Galveston, Beaumont, College Station, " +
+            "Victoria); texas_outside_houston = Texas beyond that (Dallas, Austin, San Antonio, " +
+            "Waco, Laredo, McAllen, Corpus Christi...). bid_due as ISO 8601 when a date is stated.",
           prompt: `INVITATION:\n${p.inviteText}`,
           schema: inviteParseSchema,
           effort: "low",
@@ -140,12 +146,28 @@ export const pb10IncomingBid: PloybookDefinition = {
         if (!ctx.approvalResolution) {
           const parsed = ctx.priorOutputs["parse_invite"].parsed as z.infer<typeof inviteParseSchema>;
           const records = ctx.priorOutputs["create_bid_records"];
-          const recommendation =
+          // Service-area rule: canopy/awning work is worth chasing anywhere in
+          // Texas; signage-only work sticks to the Houston metro.
+          const hasCanopyAwning = parsed.supplier_fab_items_expected.length > 0;
+          const byRelevance =
             parsed.signage_awning_relevance === "explicit"
               ? "BID"
               : parsed.signage_awning_relevance === "likely"
                 ? "REVIEW"
                 : "PASS";
+          let recommendation = byRelevance;
+          let areaNote = "";
+          if (parsed.service_area === "outside_texas") {
+            recommendation = "PASS";
+            areaNote = " Outside Texas — beyond HSC's service area.";
+          } else if (parsed.service_area === "texas_outside_houston") {
+            if (hasCanopyAwning) {
+              areaNote = " Outside the Houston metro but canopy/awning scope — HSC serves those statewide.";
+            } else {
+              recommendation = "PASS";
+              areaNote = " Signage-only outside the Houston metro — HSC keeps sign work local.";
+            }
+          }
           return {
             kind: "needs_approval",
             approval: {
@@ -153,7 +175,8 @@ export const pb10IncomingBid: PloybookDefinition = {
               title: `${recommendation}: ${records.accountName} — ${records.projectName}`,
               summary:
                 `${parsed.scope_summary} Due: ${parsed.bid_due ?? "unknown"}. ` +
-                `Supplier-fab items expected: ${parsed.supplier_fab_items_expected.join(", ") || "none identified"}.`,
+                `Supplier-fab items expected: ${parsed.supplier_fab_items_expected.join(", ") || "none identified"}.` +
+                areaNote,
               proposedAction:
                 "Approve to accept the bid (assigns Jamal, queues PB11 package analysis). Reject to pass.",
               payload: { recommendation, parsed, bidId: records.bidId },
