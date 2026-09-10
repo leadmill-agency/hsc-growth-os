@@ -18,11 +18,13 @@ export const typeLabels: Record<string, string> = {
 
 export function AccountAction({
   accountName,
+  accountId,
   which,
   label,
   title,
 }: {
   accountName: string;
+  accountId: string;
   which: string;
   label: string;
   title: string;
@@ -30,6 +32,7 @@ export function AccountAction({
   return (
     <form action={launchAccountPloybookAction} className="inline">
       <input type="hidden" name="accountName" value={accountName} />
+      <input type="hidden" name="accountId" value={accountId} />
       <input type="hidden" name="which" value={which} />
       <button
         title={title}

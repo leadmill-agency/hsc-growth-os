@@ -357,6 +357,7 @@ const accountPloybooks: Record<string, { key: string; field: string }> = {
 
 export async function launchAccountPloybookAction(formData: FormData) {
   const accountName = String(formData.get("accountName") ?? "").trim();
+  const accountId = String(formData.get("accountId") ?? "").trim();
   const which = String(formData.get("which") ?? "");
   const config = accountPloybooks[which];
   if (!accountName || !config) return;
@@ -371,6 +372,12 @@ export async function launchAccountPloybookAction(formData: FormData) {
   revalidatePath("/accounts");
   revalidatePath("/ploybooks");
   revalidatePath("/approvals");
+  // Land the user somewhere that SHOWS the run started — a silent background
+  // launch reads as a dead button (Rameel, 2026-09-10).
+  if (accountId) {
+    const { redirect } = await import("next/navigation");
+    redirect(`/accounts/${accountId}?launched=${which}`);
+  }
 }
 
 export async function createAccountAction(formData: FormData) {

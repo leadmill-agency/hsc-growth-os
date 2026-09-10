@@ -9,7 +9,7 @@ import {
   activities,
   ploybookRuns,
 } from "@/lib/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { PLOYBOOK_GUIDES } from "@/lib/guide";
 import { AccountAction, ACCOUNT_ACTION_PROPS, typeLabels } from "../account-action";
 
@@ -46,8 +46,24 @@ function renderValue(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const launchedBanners: Record<string, string> = {
+  research:
+    "Research started — it runs for ~5 minutes in the background. Findings appear on this page; refresh to check in.",
+  swarm:
+    "Swarm started — it finds the decision-makers and drafts outreach to each. The drafts land in Approvals in ~5 minutes; nothing sends without you.",
+  abm_page:
+    "Sales page build started — the draft page lands in Approvals in ~5 minutes for your review before it gets a shareable link.",
+};
+
+export default async function AccountDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ launched?: string }>;
+}) {
   const { id } = await params;
+  const { launched } = await searchParams;
   const db = await getDb();
   const account = await db.query.accounts.findFirst({ where: eq(accounts.id, id) });
   if (!account) notFound();
@@ -71,6 +87,15 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
     }),
   ]);
 
+  // Anything currently working on this account — the launch buttons run in the
+  // background, so without this the click looks like it did nothing.
+  const activeRuns = await db.query.ploybookRuns.findMany({
+    where: sql`${ploybookRuns.status} in ('running', 'queued', 'waiting_for_approval')
+      and ${ploybookRuns.triggerPayload}->>'accountName' = ${account.name}`,
+    orderBy: desc(ploybookRuns.createdAt),
+    limit: 5,
+  });
+
   // Where did this account come from? The creation activity names the run, the
   // run names the ploybook, and the guide gives it a human name.
   const created = activityRows.find((a) => a.action === "account.created");
@@ -90,6 +115,11 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="max-w-3xl space-y-6">
+      {launched && launchedBanners[launched] && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          ✓ {launchedBanners[launched]}
+        </div>
+      )}
       <div>
         <Link href="/accounts" className="text-xs text-steel hover:text-signal">
           ← All accounts
@@ -97,9 +127,9 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold">{account.name}</h1>
           <div className="flex gap-1.5">
-            <AccountAction accountName={account.name} {...ACCOUNT_ACTION_PROPS.research} />
-            <AccountAction accountName={account.name} {...ACCOUNT_ACTION_PROPS.swarm} />
-            <AccountAction accountName={account.name} {...ACCOUNT_ACTION_PROPS.abm_page} />
+            <AccountAction accountName={account.name} accountId={account.id} {...ACCOUNT_ACTION_PROPS.research} />
+            <AccountAction accountName={account.name} accountId={account.id} {...ACCOUNT_ACTION_PROPS.swarm} />
+            <AccountAction accountName={account.name} accountId={account.id} {...ACCOUNT_ACTION_PROPS.abm_page} />
           </div>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-steel">
@@ -113,6 +143,24 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           {account.industry && <span>{account.industry}</span>}
         </div>
       </div>
+
+      {activeRuns.length > 0 && (
+        <div className="rounded-lg border border-fog bg-white px-4 py-3">
+          <div className="text-sm font-semibold text-ink-700">Working on this account right now</div>
+          <ul className="mt-1 space-y-1 text-sm text-steel">
+            {activeRuns.map((r) => (
+              <li key={r.id}>
+                <Link href={`/runs/${r.id}`} className="underline hover:text-signal">
+                  {PLOYBOOK_GUIDES[r.ploybookKey]?.title ?? r.ploybookKey}
+                </Link>{" "}
+                — {r.status === "waiting_for_approval"
+                  ? "done, waiting on you in Approvals"
+                  : `${r.currentStep ?? "starting"} (refresh to update)`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-lg border border-fog bg-cloud px-4 py-3 text-sm text-ink-700">
         <span className="font-semibold">Why this account is here:</span>{" "}

@@ -90,9 +90,9 @@ export default async function AccountsPage() {
               <td className="pr-3">{a.strategicValueScore ?? "—"}</td>
               <td className="py-2 text-right">
                 <div className="flex justify-end gap-1.5">
-                  <AccountAction accountName={a.name} {...ACCOUNT_ACTION_PROPS.research} />
-                  <AccountAction accountName={a.name} {...ACCOUNT_ACTION_PROPS.swarm} />
-                  <AccountAction accountName={a.name} {...ACCOUNT_ACTION_PROPS.abm_page} />
+                  <AccountAction accountName={a.name} accountId={a.id} {...ACCOUNT_ACTION_PROPS.research} />
+                  <AccountAction accountName={a.name} accountId={a.id} {...ACCOUNT_ACTION_PROPS.swarm} />
+                  <AccountAction accountName={a.name} accountId={a.id} {...ACCOUNT_ACTION_PROPS.abm_page} />
                 </div>
               </td>
             </tr>
