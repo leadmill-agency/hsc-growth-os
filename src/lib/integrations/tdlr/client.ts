@@ -90,6 +90,8 @@ export function formatTdlrSignal(p: TdlrProject): { signalText: string; sourceUr
       `${city}, ${county} County, TX. ${work}, estimated cost $${Math.round(p.EstimatedCost).toLocaleString()}, ` +
       `status: ${status}, estimated construction start ${start}. ` +
       `Commercial construction registration — signage procurement typically follows.`,
-    sourceUrl: `https://www.tdlr.texas.gov/TABS/Search/Project/${p.ProjectId}`,
+    // The public detail route is /Search/Details/{ProjectId} — /Search/Project/{id}
+    // renders "Project Not Found" (verified live 2026-09-10).
+    sourceUrl: `https://www.tdlr.texas.gov/TABS/Search/Details/${p.ProjectId}`,
   };
 }

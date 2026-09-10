@@ -69,7 +69,7 @@ export function isSignageRelevant(record: CohOccupancyRecord): boolean {
 }
 
 /** Render one CO as a radar signal (PB05 input). */
-export function formatCohSignal(record: CohOccupancyRecord): { signalText: string; sourceUrl: string } {
+export function formatCohSignal(record: CohOccupancyRecord): { signalText: string; sourceUrl?: string } {
   return {
     signalText:
       `City of Houston Certificate of Occupancy (permit ${record.permitNumber}): ` +
@@ -77,6 +77,9 @@ export function formatCohSignal(record: CohOccupancyRecord): { signalText: strin
       `Occupancy details: ${record.description}. ` +
       `A new certificate of occupancy means this business is opening or moving into this ` +
       `location now — storefront signage is typically purchased around this stage.`,
-    sourceUrl: "https://cohtora.houstontx.gov/approot/soldpermits/online_permit.htm",
+    // The WebFOCUS portal has no per-permit deep link (POST-driven), so a URL
+    // here just dumps the user on the portal home — misleading; omit it. The
+    // permit number in the signal text is the lookup key if anyone needs it.
+    sourceUrl: undefined,
   };
 }
