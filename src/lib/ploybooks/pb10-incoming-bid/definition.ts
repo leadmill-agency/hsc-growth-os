@@ -183,7 +183,18 @@ export const pb10IncomingBid: PloybookDefinition = {
             },
           };
         }
-        return { kind: "completed", outputs: { decision: ctx.approvalResolution.status } };
+        const res = (ctx.approvalResolution.payload ?? {}) as {
+          rejectionCode?: string;
+          rejectionNote?: string;
+        };
+        return {
+          kind: "completed",
+          outputs: {
+            decision: ctx.approvalResolution.status,
+            rejectionCode: res.rejectionCode ?? null,
+            rejectionNote: res.rejectionNote ?? null,
+          },
+        };
       },
     },
     {
@@ -195,11 +206,22 @@ export const pb10IncomingBid: PloybookDefinition = {
         const records = ctx.priorOutputs["create_bid_records"];
         const { eq } = await import("drizzle-orm");
         if (decision === "rejected") {
+          const code = ctx.priorOutputs["recommend"].rejectionCode as string | null;
+          const note = ctx.priorOutputs["recommend"].rejectionNote as string | null;
+          const reason = [code?.replaceAll("_", " "), note].filter(Boolean).join(" — ");
+          const { sql } = await import("drizzle-orm");
           await ctx.db
             .update(bids)
-            .set({ status: "passed", updatedAt: new Date() })
+            .set({
+              status: "passed",
+              lossReason: reason || null,
+              ...(reason
+                ? { notes: sql`coalesce(${bids.notes} || ' — ', '') || ${"Passed: " + reason}` }
+                : {}),
+              updatedAt: new Date(),
+            })
             .where(eq(bids.id, records.bidId as string));
-          return { kind: "completed", outputs: { status: "passed", childRunId: null } };
+          return { kind: "completed", outputs: { status: "passed", childRunId: null, reason } };
         }
         await ctx.db
           .update(bids)

@@ -67,8 +67,18 @@ export async function resolveApprovalAction(formData: FormData) {
   const approvalId = String(formData.get("approvalId") ?? "");
   const decision = String(formData.get("decision") ?? "") as "approved" | "rejected";
   const recipientEmail = String(formData.get("recipientEmail") ?? "").trim();
+  // Rejection code + note (per Rameel 2026-09-10): captured so passes are
+  // explainable later — they land in resolutionPayload and, for bids, on the card.
+  const rejectionCode = String(formData.get("rejectionCode") ?? "").trim();
+  const rejectionNote = String(formData.get("rejectionNote") ?? "").trim();
   const db = await getDb();
-  await resolveApproval(db, approvalId, decision, { resolvedBy: "user" });
+  await resolveApproval(db, approvalId, decision, {
+    resolvedBy: "user",
+    resolutionPayload:
+      decision === "rejected" && (rejectionCode || rejectionNote)
+        ? { rejectionCode: rejectionCode || null, rejectionNote: rejectionNote || null }
+        : undefined,
+  });
 
   // Approve + recipient on an outreach/follow-up = actually send (guarded layer
   // still refuses unless ALLOW_EXTERNAL_SEND=true and the domain is live).

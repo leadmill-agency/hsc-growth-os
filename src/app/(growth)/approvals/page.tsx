@@ -7,6 +7,20 @@ export const dynamic = "force-dynamic";
 
 // §15.9 — one approval inbox for everything.
 
+// Rejection codes (per Rameel 2026-09-10): a pass should say why, so patterns
+// ("everything from X is too far") become visible instead of anecdotal.
+const rejectionCodes: [string, string][] = [
+  ["too_far", "Too far away"],
+  ["no_sign_scope", "No sign/canopy scope"],
+  ["too_small", "Job too small"],
+  ["low_margin", "Margin too thin"],
+  ["no_capacity", "No bandwidth right now"],
+  ["wrong_fit", "Not our kind of work/GC"],
+  ["draft_wrong", "Draft is wrong — needs redo"],
+  ["other", "Other"],
+];
+const rejectionLabel = new Map(rejectionCodes);
+
 export default async function ApprovalsPage() {
   const db = await getDb();
   const pending = await db.query.approvals.findMany({
@@ -58,9 +72,26 @@ export default async function ApprovalsPage() {
                     : "Approve"}
                 </button>
               </form>
-              <form action={resolveApprovalAction}>
+              <form action={resolveApprovalAction} className="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="approvalId" value={a.id} />
                 <input type="hidden" name="decision" value="rejected" />
+                <select
+                  name="rejectionCode"
+                  defaultValue=""
+                  className="rounded border border-fog px-2 py-1 text-xs text-ink-700"
+                >
+                  <option value="">Why reject? (optional)</option>
+                  {rejectionCodes.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="rejectionNote"
+                  placeholder="Note (optional)"
+                  className="w-44 rounded border border-fog px-2 py-1 text-xs"
+                />
                 <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">
                   Reject
                 </button>
@@ -73,12 +104,22 @@ export default async function ApprovalsPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink-700">Recently resolved</h2>
         <ul className="space-y-1 text-sm text-steel">
-          {resolved.map((a) => (
-            <li key={a.id}>
-              {a.title} — <span className="font-medium">{a.status}</span>
-              {a.resolvedBy ? ` by ${a.resolvedBy}` : ""}
-            </li>
-          ))}
+          {resolved.map((a) => {
+            const res = (a.resolutionPayload ?? {}) as { rejectionCode?: string; rejectionNote?: string };
+            return (
+              <li key={a.id}>
+                {a.title} — <span className="font-medium">{a.status}</span>
+                {a.resolvedBy ? ` by ${a.resolvedBy}` : ""}
+                {res.rejectionCode && (
+                  <span className="text-steel/80">
+                    {" "}
+                    ({rejectionLabel.get(res.rejectionCode) ?? res.rejectionCode}
+                    {res.rejectionNote ? ` — ${res.rejectionNote}` : ""})
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
     </div>
