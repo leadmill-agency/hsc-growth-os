@@ -146,6 +146,53 @@ export async function pursueOpportunityAction(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function runBidQaAction(formData: FormData) {
+  const bidId = String(formData.get("bidId") ?? "");
+  if (!bidId) return;
+  const db = await getDb();
+  const runId = await launchRun(db, {
+    ploybookKey: "pb12_bid_qa",
+    triggerType: "manual",
+    triggerPayload: { bidId },
+    initiatedBy: "user",
+  });
+  executeInBackground(db, runId);
+  revalidatePath("/bids");
+  revalidatePath("/approvals");
+}
+
+export async function analyzeBidAction(formData: FormData) {
+  const bidId = String(formData.get("bidId") ?? "");
+  const folderPath = String(formData.get("folderPath") ?? "").trim();
+  if (!bidId || !folderPath) return;
+  const db = await getDb();
+  const { bids, opportunities, projects } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const bid = await db.query.bids.findFirst({ where: eq(bids.id, bidId) });
+  const opp = bid?.opportunityId
+    ? await db.query.opportunities.findFirst({ where: eq(opportunities.id, bid.opportunityId) })
+    : null;
+  const project = opp?.projectId
+    ? await db.query.projects.findFirst({ where: eq(projects.id, opp.projectId) })
+    : null;
+  const runId = await launchRun(db, {
+    ploybookKey: "pb11_bid_analyzer",
+    triggerType: "manual",
+    triggerPayload: {
+      folderPath,
+      bidId,
+      opportunityId: bid?.opportunityId ?? undefined,
+      projectId: opp?.projectId ?? undefined,
+      projectName: project?.name ?? opp?.name,
+      bidDueAt: bid?.dueAt?.toISOString(),
+    },
+    initiatedBy: "user",
+  });
+  executeInBackground(db, runId);
+  revalidatePath("/bids");
+  revalidatePath("/ploybooks");
+}
+
 export async function pullTdlrAction() {
   const db = await getDb();
   const { runTdlrPull } = await import("@/lib/integrations/tdlr/runner");
