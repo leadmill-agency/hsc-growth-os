@@ -21,6 +21,9 @@ const ORDER = [
   "pb13_bid_followup",
   "pb14_deal_room",
   "pb15_business_case",
+  "pb16_local_seo",
+  "pb17_content_builder",
+  "pb18_growth_operator",
   "pb00_dummy",
 ];
 

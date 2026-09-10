@@ -15,6 +15,9 @@ import { pb12BidQa } from "./pb12-bid-qa/definition";
 import { pb13BidFollowup } from "./pb13-bid-followup/definition";
 import { pb14DealRoom } from "./pb14-deal-room/definition";
 import { pb15BusinessCase } from "./pb15-business-case/definition";
+import { pb16LocalSeo } from "./pb16-local-seo/definition";
+import { pb17ContentBuilder } from "./pb17-content-builder/definition";
+import { pb18GrowthOperator } from "./pb18-growth-operator/definition";
 
 // Register all ploybooks. Import this module once (server startup / test setup)
 // before using the runner. Remaining PBs register here as they are built.
@@ -35,6 +38,9 @@ registerPloybook(pb12BidQa);
 registerPloybook(pb13BidFollowup);
 registerPloybook(pb14DealRoom);
 registerPloybook(pb15BusinessCase);
+registerPloybook(pb16LocalSeo);
+registerPloybook(pb17ContentBuilder);
+registerPloybook(pb18GrowthOperator);
 
 export * from "./types";
 export * from "./registry";

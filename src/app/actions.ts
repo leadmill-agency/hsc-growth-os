@@ -33,6 +33,8 @@ const inputFieldByPloybook: Record<string, string> = {
   pb13_bid_followup: "bidId",
   pb14_deal_room: "opportunityId",
   pb15_business_case: "opportunityId",
+  pb16_local_seo: "matrixInput",
+  pb17_content_builder: "topicInput",
 };
 
 export async function launchPloybookAction(formData: FormData) {

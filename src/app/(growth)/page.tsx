@@ -6,9 +6,11 @@ import {
   ploybookRuns,
   approvals,
   activities,
+  evidence,
 } from "@/lib/db/schema";
-import { count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { resolveApprovalAction } from "@/app/actions";
+import type { WeeklyBrief } from "@/lib/ploybooks/pb18-growth-operator/definition";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +37,63 @@ export default async function Home() {
     orderBy: desc(activities.occurredAt),
     limit: 15,
   });
+  const briefRow = await db.query.evidence.findFirst({
+    where: and(eq(evidence.entityType, "system"), eq(evidence.fieldName, "weekly_brief")),
+    orderBy: desc(evidence.retrievedAt),
+  });
+  const brief = (briefRow?.value ?? null) as WeeklyBrief | null;
 
   return (
     <div className="max-w-4xl space-y-8">
       <h1 className="text-xl font-semibold">Growth Command Center</h1>
+
+      {brief && (
+        <section className="rounded-lg border border-fog bg-white p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold">This week: {brief.headline}</h2>
+            <span className="text-xs text-steel">
+              {brief.generatedAt?.slice(0, 10)} · PB18
+            </span>
+          </div>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-700">
+            {brief.what_changed.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          {brief.recommendations.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+                Recommended this week
+              </div>
+              <ol className="mt-2 space-y-1.5 text-sm">
+                {[...brief.recommendations]
+                  .sort((a, b) => a.priority - b.priority)
+                  .slice(0, 5)
+                  .map((rec) => (
+                    <li key={rec.action} className="flex items-start gap-2">
+                      <span className="mt-0.5 rounded bg-signal px-1.5 text-xs font-bold text-white">
+                        {rec.priority}
+                      </span>
+                      <span>
+                        <span className="font-medium">{rec.action}</span>
+                        <span className="text-steel">
+                          {" "}
+                          — {rec.reason}
+                          {rec.ploybook_key ? ` (run ${rec.ploybook_key.split("_")[0].toUpperCase()} on Ploybooks)` : ""}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+              </ol>
+            </div>
+          )}
+          {brief.watchouts.length > 0 && (
+            <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Watch: {brief.watchouts.join(" · ")}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="grid grid-cols-4 gap-4">
         {[

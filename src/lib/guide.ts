@@ -30,6 +30,7 @@ export const GENERAL_GUIDE = {
     "Approving a draft means 'this is good — I'll send/publish it' or 'I did send it'. Rejecting keeps the research but stops the action. Nothing goes out by itself.",
 };
 
+// (appended below via PLOYBOOK_GUIDES entries pb16–pb18)
 export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
   pb00_dummy: {
     key: "pb00_dummy",
@@ -203,6 +204,43 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
       "It drafts the page from our real research: scope, process timeline, warranty, exclusions, FAQs. Pricing stays blank until a person enters it — the system never prices anything.",
     whatYouGet:
       "Approve to publish at a private link. Every view is logged, and 3+ views in 24 hours raises a 'call them now' alert.",
+  },
+  pb16_local_seo: {
+    key: "pb16_local_seo",
+    title: "Build a city + product page",
+    audience: "Rameel",
+    whenToUse:
+      "We're getting demand from a suburb we don't have a page for — like monument signs in Richmond — and want to rank there.",
+    whatToEnter: "City × Product. Example: Richmond × Monument Signs.",
+    whatHappens:
+      "It first checks the live site — if a page already covers it, it stops and says so instead of creating a near-duplicate. Then it researches real local facts and writes a 1,000+ word draft where every local claim carries a source.",
+    whatYouGet:
+      "A publish-ready draft in Approvals, with anything unverified listed up top to confirm first. Approving means 'good to publish' — adding it to the website is the next human step.",
+    caveat: "Never publish with unconfirmed claims still listed. Thin local research means a shorter local section, not invented color.",
+  },
+  pb17_content_builder: {
+    key: "pb17_content_builder",
+    title: "Answer a real customer question",
+    audience: "Everyone",
+    whenToUse:
+      "Customers keep asking the same question, sales keeps hitting the same objection, or you spot a search people make that we don't answer.",
+    whatToEnter: "The question in plain words. Example: channel letter cost in Houston.",
+    whatHappens:
+      "It checks we don't already answer it, researches the real answer, and writes an article that answers the question in the first paragraph. Dollar figures are never invented — anything numeric goes on a confirm-first list.",
+    whatYouGet:
+      "A 700+ word draft in Approvals, plus a list of real HSC project examples to attach before publishing.",
+  },
+  pb18_growth_operator: {
+    key: "pb18_growth_operator",
+    title: "The Monday brief (automatic)",
+    audience: "Rameel",
+    whenToUse:
+      "You don't run this — it runs itself every Monday morning and appears at the top of the Home page. Run it manually only if you want a fresh brief mid-week.",
+    whatToEnter: "Nothing.",
+    whatHappens:
+      "It counts what actually happened this week straight from the database — opportunities by source, bids, pending approvals, follow-ups waiting, page views — and turns it into observations and ranked recommendations.",
+    whatYouGet:
+      "The brief on the Home page. Every recommendation names the playbook to run or the human action to take. The numbers are real; a quiet week says 'quiet week'.",
   },
   pb15_business_case: {
     key: "pb15_business_case",

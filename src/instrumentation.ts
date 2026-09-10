@@ -62,6 +62,27 @@ export async function register() {
       console.error("[scheduler] follow-up drafting failed:", err);
     }
 
+    // PB18 weekly brief — Monday after Houston morning
+    try {
+      const now = new Date();
+      if (now.getUTCDay() === 1 && now.getUTCHours() >= 13) {
+        const { pb18RanThisWeek } = await import("@/lib/ploybooks/pb18-growth-operator/definition");
+        if (!(await pb18RanThisWeek(db))) {
+          const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
+          await import("@/lib/ploybooks");
+          console.log("[scheduler] running weekly PB18 growth brief");
+          const runId = await launchRun(db, {
+            ploybookKey: "pb18_growth_operator",
+            triggerType: "scheduled",
+            initiatedBy: "system",
+          });
+          await executeRun(db, runId);
+        }
+      }
+    } catch (err) {
+      console.error("[scheduler] weekly brief failed:", err);
+    }
+
     // Daily TDLR radar pull (after Houston morning)
     try {
       const hourUtc = new Date().getUTCHours();

@@ -40,9 +40,9 @@ Single source of progress truth. A row closes only when the PB's own PRD §14 ac
 | PB13 | Bid Follow-Up / Award Watch | A | 5 | **MVP done 2026-09-09** | submitted-bid fixture | bid.submitted event subscription auto-creates Day 2/7/14/30 plan; scheduler drafts due follow-ups into approvals; outcome cancels remaining |
 | PB14 | Proposal Deal Room | A | 5 | **MVP done 2026-09-09** | seeded opp | private /d/[token] page, publish-gated, pricing human-only, per-view tracking + 3-in-24h high-engagement trigger |
 | PB15 | Business Case / Deal Progression | C | 5 | **MVP done 2026-09-09** | seeded opp | confirmed facts strictly separated from ASSUMPTION-labeled ranges |
-| PB16 | Programmatic Local SEO | C | 6 | todo | existing SEO page | — |
-| PB17 | Content Opportunity + Page Builder | C | 6 | todo | GSC gap | — |
-| PB18 | Growth Operator | A | 7 | todo | full-system data | — |
+| PB16 | Programmatic Local SEO | C | 6 | **MVP done 2026-09-09** | Richmond × Monument Signs fixture | live-sitemap coverage check (refuses near-duplicates), sourced local facts, 1,000-word minimum enforced in code, unverified claims surfaced on the approval |
+| PB17 | Content Opportunity + Page Builder | C | 6 | **MVP done 2026-09-09** | channel-letter-cost fixture | front-loaded answer, 700-word minimum, dollar figures never invented (confirm-first list), real-example asks; GSC-driven gap detection still todo |
+| PB18 | Growth Operator | A | 7 | **MVP done 2026-09-09 — ALL ORIGINAL 18 COMPLETE** | seeded week fixture | deterministic SQL metrics + LLM observations/ranked runnable recommendations; auto-runs Mondays; brief renders on Home |
 | PB21 | Creative Intelligence (genome schema first) | ext | 8 | todo | 50-experiment seed library | — |
 | PB19 | Social Content Engine | ext | 8 | todo | one real HSC project asset set | — |
 | PB20 | Social Engagement & Referral Engine | ext | 8 | todo | IG comment → opportunity path | — |

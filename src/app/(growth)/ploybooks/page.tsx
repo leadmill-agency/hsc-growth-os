@@ -25,6 +25,8 @@ const inputPlaceholders: Record<string, string> = {
   pb13_bid_followup: "Bid ID (submitted bid)",
   pb14_deal_room: "Opportunity ID",
   pb15_business_case: "Opportunity ID",
+  pb16_local_seo: "City × Product, e.g. Richmond × Monument Signs",
+  pb17_content_builder: "A real question, e.g. channel letter cost in Houston",
 };
 
 const statusColor: Record<string, string> = {
