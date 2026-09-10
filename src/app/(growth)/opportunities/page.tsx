@@ -87,9 +87,15 @@ export default async function OpportunitiesPage({
       ? inArray(opportunities.source, filter.sources)
       : notInArray(sql`coalesce(${opportunities.source}, '')`, knownSources)
     : undefined;
-  // This is a working list: won, lost, and dismissed all leave it (per Rameel).
-  // Closed deals live on in Accounts, History, and the brief's win numbers.
-  const openStages = notInArray(opportunities.stage, ["dismissed", "won", "lost"]);
+  // This is the HUNTING list (per Rameel 2026-09-10): things we found and may
+  // chase. Won/lost/dismissed leave it, and inbound bid invites never show here
+  // — they came to us, so they live on the Bids page with their decision in
+  // Approvals → Bid Decisions. (The opportunity row still exists underneath for
+  // account/project lineage and win records.)
+  const openStages = and(
+    notInArray(opportunities.stage, ["dismissed", "won", "lost"]),
+    notInArray(sql`coalesce(${opportunities.opportunityType}, '')`, ["incoming_bid", "bid"])
+  );
   const where = sourceWhere ? and(openStages, sourceWhere) : openStages;
   // Best first (per Rameel): score desc, newest breaks ties.
   const rows = await db.query.opportunities.findMany({
@@ -164,7 +170,10 @@ export default async function OpportunitiesPage({
         Houston certificates of occupancy, and a web scan for franchise expansions, new
         developments, and multi-location operators — ranked best-first. Scores of 75+ research
         themselves up to a daily budget (currently {autoPursueDailyCap()}/day — anything over
-        waits its turn tomorrow); their outreach drafts land in Approvals. <span className="font-semibold">Pursue</span> starts that same research
+        waits its turn tomorrow); their outreach drafts land in Approvals.{" "}
+        <span className="font-semibold">Incoming bid invites are NOT here</span> — work that
+        comes to us lives on the Bids page, with its yes/no in Approvals → Bid Decisions.{" "}
+        <span className="font-semibold">Pursue</span> starts that same research
         (~5 min) on anything the budget didn&apos;t reach;{" "}
         <span className="font-semibold">the drafts never send without you.</span>
       </div>

@@ -46,10 +46,17 @@ async function main() {
         stakeholders: stakeholders as never,
       });
       const old = ((approval.payload ?? {}) as { draft?: Record<string, unknown> }).draft ?? {};
+      // Keep the Hunter enrichment ONLY if it still matches the draft's target
+      // (a re-draft can change target_contact; a mismatched pre-filled email
+      // would send to the wrong person).
+      const target = String((draft as { target_contact?: string }).target_contact ?? "").toLowerCase();
+      const oldEmail = String(old.suggested_email ?? "").toLowerCase();
+      const nameTokens = target.split(/[^a-z]+/).filter((t) => t.length > 2);
+      const emailMatchesTarget =
+        !!oldEmail && nameTokens.some((t) => oldEmail.split("@")[0].includes(t));
       const merged = {
         ...draft,
-        // keep the Hunter enrichment already on the card
-        ...(old.suggested_email
+        ...(emailMatchesTarget
           ? {
               suggested_email: old.suggested_email,
               suggested_email_confidence: old.suggested_email_confidence,

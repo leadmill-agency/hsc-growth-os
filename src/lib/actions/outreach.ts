@@ -158,10 +158,14 @@ export async function draftOutreach(params: {
       "a different department/person handle that? · soft close ('We'd love to quote...'). " +
       "FORMATTING: one thought per paragraph, ONE OR TWO SHORT SENTENCES each, with a blank " +
       "line between every paragraph — 4 to 6 short paragraphs, never a wall of text. " +
-      "JARGON BAN: never write like a database. No 'registered with TDLR', 'TABS filing', " +
-      "'certificate of occupancy', 'CO issued', 'per the filing' — translate to how a person " +
-      "talks: 'I saw your new building on the Gulf Freeway', 'I saw y'all are opening a " +
-      "location in Katy', 'I saw the addition you're planning in Conroe'. 120 words max. No " +
+      "GREETING on its own line ('Hi Jarrod,'), blank line, then 'This is Ray...'. " +
+      "HARD RULE — never reveal the plumbing: the brief you receive is full of database and " +
+      "government wording (TDLR, TABS, filing, permit, certificate of occupancy, 'registered', " +
+      "'listed as owner contact'). NONE of those words may appear in the email. You know about " +
+      "the project; you never say HOW. Refer to the project only by what it IS and WHERE: " +
+      "'your office/warehouse addition on FM 3083 in Conroe', 'the new location y'all are " +
+      "opening in Katy'. Saying 'registered with TDLR' or 'listed on the filing' instantly " +
+      "reads as a mail-merge robot and kills the reply. 120 words max. No " +
       "flattery, no marketing language. NEVER promise instant quotes or mockups before a site " +
       "survey — the real process is call, then survey, then mockup with itemized estimate. Use " +
       "only facts from the brief; if a fact is not verified, do not state it as fact. The " +
