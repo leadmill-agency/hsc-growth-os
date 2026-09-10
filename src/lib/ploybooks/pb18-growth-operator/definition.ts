@@ -122,6 +122,51 @@ export async function gatherWeeklyMetrics(db: Db): Promise<WeeklyMetrics> {
   };
 }
 
+// The LLM never sees the raw camelCase metrics object — models copy whatever
+// vocabulary they're shown ("0 activePursuits" made it into a live brief).
+// Everything is translated to plain English BEFORE the prompt.
+const sourceNames: Record<string, string> = {
+  tdlr: "TDLR construction filings",
+  coh_co: "new certificates of occupancy (businesses moving in)",
+  web_scout: "the daily web scan",
+  manual_signal: "signals the team pasted in",
+  website_intent: "website visitor tracking",
+  fixture: "test data",
+  bid_package: "uploaded bid packages",
+};
+
+export function describeMetrics(m: WeeklyMetrics): string {
+  const lines: string[] = [];
+  const src = Object.entries(m.opportunities.bySource)
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `${n} from ${sourceNames[s] ?? s}`)
+    .join(", ");
+  lines.push(
+    `New opportunities found in the last 7 days: ${m.opportunities.discovered}${src ? ` (${src})` : ""}.`
+  );
+  lines.push(
+    `Opportunities being actively worked right now (researching or bidding): ${m.opportunities.activePursuits}.`
+  );
+  if (m.opportunities.topUnactioned.length > 0) {
+    lines.push(`Strongest leads still waiting for a yes or no:`);
+    for (const o of m.opportunities.topUnactioned) {
+      lines.push(
+        `  - "${o.name}" (score ${o.score ?? "unscored"})${o.nextAction ? ` — suggested next move: ${o.nextAction}` : ""}`
+      );
+    }
+  }
+  lines.push(
+    `Bids this week: ${m.bids.created} started, ${m.bids.submitted} submitted, ${m.bids.won} won, ${m.bids.lost} lost; ${m.bids.estimating} currently being estimated.`
+  );
+  lines.push(`Drafts waiting for approval on the Approvals page: ${m.approvalsPending}.`);
+  lines.push(`Bid follow-up emails drafted and waiting to be sent: ${m.followupsAwaitingSend}.`);
+  lines.push(
+    `Proposal pages viewed by prospects: ${m.proposalViews}. High-intent website visits: ${m.highIntentVisits}.`
+  );
+  lines.push(`New companies added to Accounts this week: ${m.accountsCreated}.`);
+  return lines.join("\n");
+}
+
 const briefSchema = z.object({
   headline: z.string(),
   what_changed: z.array(z.string()).min(1).max(7),
@@ -197,7 +242,7 @@ export const pb18GrowthOperator: PloybookDefinition = {
             "pb10_incoming_bid, pb12_bid_qa, pb14_deal_room, pb15_business_case, pb16_local_seo, " +
             "pb17_content_builder — or null for human actions. Reference opportunities by their " +
             "plain names.",
-          prompt: `TODAY'S NUMBERS (last 7 days of activity):\n${JSON.stringify(metrics, null, 1)}\n\nWrite the brief.`,
+          prompt: `TODAY'S NUMBERS (last 7 days of activity, already in plain English — keep it that way):\n${describeMetrics(metrics)}\n\nWrite the brief.`,
           schema: briefSchema,
           effort: "medium",
         });
