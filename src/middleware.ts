@@ -5,6 +5,7 @@ import { isValidSession, SESSION_COOKIE } from "@/lib/auth/session";
 //   /login            — the gate itself
 //   /p/*              — customer-facing ABM pages (private by unguessable token)
 //   /api/visitor      — RB2B webhook (guarded by X-Intake-Token)
+//   /api/inbound      — Resend inbound-email webhook (guarded by token param)
 // Everything else requires a valid session cookie.
 // If AUTH_SECRET/APP_PASSWORD are unset (fresh local dev), the gate stays open.
 
@@ -21,5 +22,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|p/|d/|api/visitor|api/rb2b|_next/|favicon\\.ico|.*\\.(?:png|jpg|svg|ico|css|js)$).*)"],
+  matcher: ["/((?!login|p/|d/|api/visitor|api/rb2b|api/inbound|_next/|favicon\\.ico|.*\\.(?:png|jpg|svg|ico|css|js)$).*)"],
 };
