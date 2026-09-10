@@ -1,7 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { z } from "zod";
 import type { PloybookDefinition } from "../types";
 import { getLLMClient } from "@/lib/ai/client";
+import { generateStructuredFromPdf, splitPdfForVision } from "@/lib/ai/vision";
 import { ingestBidFolder, type IngestedDoc } from "@/lib/documents/ingest";
 import { saveEvidence } from "@/lib/actions/entities";
 import { emitEvent, logActivity } from "@/lib/events";
@@ -49,6 +51,89 @@ const rfqDraftSchema = z.object({
 
 const MAX_ANALYSIS_CHARS = 60_000;
 const MAX_RELEVANT_DOCS = 12;
+
+// Vision fallback (per Rameel 2026-09-10, after the Wingbay permit set): most
+// real bid packages are drawings with no text layer — the model must LOOK at
+// the pages. Cost guards: files and total pages are capped (env-tunable).
+const VISION_MAX_FILES = Number(process.env.VISION_MAX_FILES ?? 4);
+const VISION_MAX_TOTAL_PAGES = Number(process.env.VISION_MAX_TOTAL_PAGES ?? 150);
+
+async function listPdfFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const out: string[] = [];
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") || entry.name === "__MACOSX") continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...(await listPdfFiles(full)));
+    else if (entry.name.toLowerCase().endsWith(".pdf")) out.push(full);
+  }
+  return out;
+}
+
+const VISION_PROMPT =
+  "You are looking at pages from a construction bid/permit drawing set, on behalf of Houston " +
+  "Sign Crafters (signs, awnings, canopies — Houston TX). Read the sheets visually: title " +
+  "blocks for sheet numbers, sign schedules, elevations with signage callouts, awning/canopy " +
+  "details, site plans with monument/pylon locations, and any specification pages. Extract " +
+  "ONLY signage/awning/canopy scope you can actually see on these pages — never invent items. " +
+  "sheet_or_spec_refs: the sheet numbers from title blocks (e.g. A-201, SG-1). fabrication: " +
+  "in_house for channel letters, cabinets, monuments, vinyl, interior signage; supplier_fab " +
+  "for awnings, canopies, and backlit signs; unclear otherwise. Quantities ONLY when a " +
+  "schedule or callout explicitly states them — never count symbols to infer a quantity; put " +
+  "what the sheet says in quantity_note with a confidence reflecting how explicit it is. " +
+  "Risk flags to watch: electrical hookup, engineering/delegated design, structural " +
+  "coordination, field verification. Everything unclear goes in unknowns. If these pages " +
+  "contain no signage/awning/canopy content at all, return empty arrays.";
+
+/** Visually read the package's PDFs. Returns null when the folder has no PDFs. */
+async function visionExtractScope(
+  folderPath: string,
+  projectName: string | undefined
+): Promise<{ extraction: ScopeExtraction; pagesRead: number; filesRead: number } | null> {
+  const files = (await listPdfFiles(folderPath)).slice(0, VISION_MAX_FILES);
+  if (files.length === 0) return null;
+  const merged: ScopeExtraction = {
+    scope_items: [],
+    exclusions_to_state: [],
+    risk_flags: [],
+    rfis_needed: [],
+    addendum_changes: [],
+    unknowns: [],
+  };
+  let pagesRead = 0;
+  let filesRead = 0;
+  for (const file of files) {
+    if (pagesRead >= VISION_MAX_TOTAL_PAGES) break;
+    const data = await readFile(file).catch(() => null);
+    if (!data) continue;
+    let chunks;
+    try {
+      chunks = await splitPdfForVision(data);
+    } catch {
+      continue; // corrupt/encrypted PDF — skip, the text path already flagged it
+    }
+    filesRead++;
+    for (const chunk of chunks) {
+      if (pagesRead >= VISION_MAX_TOTAL_PAGES) break;
+      const label = `${basename(file)} (PDF pages ${chunk.pageOffset + 1}-${chunk.pageOffset + chunk.pageCount})`;
+      const extraction = await generateStructuredFromPdf({
+        prompt:
+          `${VISION_PROMPT}\n\nProject: ${projectName ?? "unknown"}\nFile: ${label} — cite ` +
+          `sheet numbers from the title blocks, not PDF page numbers.`,
+        pdf: { filename: basename(file), data: chunk.data },
+        schema: scopeExtractionSchema,
+      });
+      pagesRead += chunk.pageCount;
+      merged.scope_items.push(...extraction.scope_items);
+      merged.exclusions_to_state.push(...extraction.exclusions_to_state);
+      merged.risk_flags.push(...extraction.risk_flags);
+      merged.rfis_needed.push(...extraction.rfis_needed);
+      merged.addendum_changes.push(...extraction.addendum_changes);
+      merged.unknowns.push(...extraction.unknowns);
+    }
+  }
+  return { extraction: merged, pagesRead, filesRead };
+}
 const EXCERPT_KEYWORDS = /\b(sign|signage|canop\w*|awning\w*|monument|pylon|storefront|channel letter\w*)\b/gi;
 
 /**
@@ -120,18 +205,51 @@ export const pb11BidAnalyzer: PloybookDefinition = {
       async run(ctx) {
         const ingested = ctx.priorOutputs["ingest_documents"];
         const relevant = (ingested.relevant as IngestedDoc[]).slice(0, MAX_RELEVANT_DOCS);
-        if (relevant.length === 0) {
-          // Dead-ending silently made the upload look broken (Wingbay permit
-          // set, 2026-09-10): say ON THE BID CARD what happened and what to do.
-          const p = ctx.triggerPayload as { bidId?: string };
+        const allTextless = relevant.length > 0 && relevant.every((d) => !d.textPath);
+        if (relevant.length === 0 || allTextless) {
+          const p = ctx.triggerPayload as { bidId?: string; folderPath?: string; projectName?: string };
+          // No readable text → LOOK at the pages (drawings/scans are the normal
+          // case for real bid packages, per the Wingbay permit set 2026-09-10).
+          let visionNote = "";
+          if (p.folderPath) {
+            try {
+              const vision = await visionExtractScope(p.folderPath, p.projectName);
+              if (vision && vision.extraction.scope_items.length > 0) {
+                if (p.bidId) {
+                  await logActivity(ctx.db, {
+                    entityType: "bid",
+                    entityId: p.bidId,
+                    action: "bid.vision_scope_used",
+                    detail: `No machine-readable text — read ${vision.pagesRead} drawing page(s) across ${vision.filesRead} PDF(s) visually`,
+                    ploybookRunId: ctx.runId,
+                  });
+                }
+                return {
+                  kind: "completed",
+                  outputs: {
+                    extraction: vision.extraction,
+                    viaVision: true,
+                    visionPagesRead: vision.pagesRead,
+                  },
+                };
+              }
+              visionNote = vision
+                ? ` A visual read of ${vision.pagesRead} drawing page(s) also found no signage/awning scope.`
+                : "";
+            } catch (err) {
+              visionNote = ` Visual read of the drawings failed (${(err as Error).message.slice(0, 120)}).`;
+            }
+          }
+          // Dead-ending silently made the upload look broken: say ON THE BID
+          // CARD what happened and what to do.
           const lowQuality = (ingested.lowQualityFiles as string[]) ?? [];
           const total = (ingested.totalIngested as number) ?? 0;
           const verdict =
-            total > 0 && lowQuality.length === total
+            (total > 0 && lowQuality.length === total
               ? `Analyzer read ${total} file(s) but none had machine-readable text — likely scanned drawings/plan sheets. ` +
                 `Upload the text documents (invite email, specs, scope sheets) to analyze, or take off manually.`
               : `Analyzer read ${total} file(s) but found no signage/awning-relevant content. ` +
-                `If signs are in this package, upload the specific spec/drawing index files.`;
+                `If signs are in this package, upload the specific spec/drawing index files.`) + visionNote;
           if (p.bidId) {
             const { eq, sql } = await import("drizzle-orm");
             await ctx.db
@@ -206,7 +324,11 @@ export const pb11BidAnalyzer: PloybookDefinition = {
           addendumChanges: extraction.addendum_changes,
           unknowns: extraction.unknowns,
           lowQualityFiles: ingested.lowQualityFiles,
+          scopeReadVisually: !!extractionStep.viaVision,
           verificationNote:
+            (extractionStep.viaVision
+              ? `Scope was read VISUALLY from ${extractionStep.visionPagesRead ?? "?"} drawing page(s) (no machine-readable text in the package). `
+              : "") +
             "All quantities are AI-extracted and confidence-labeled — estimator must verify every quantity and price against the actual sheets before bidding.",
         };
         if (p.bidId) {
