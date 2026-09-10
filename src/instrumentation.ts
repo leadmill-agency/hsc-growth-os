@@ -94,17 +94,34 @@ export async function register() {
       console.error("[scheduler] weekly brief failed:", err);
     }
 
-    // Daily TDLR radar pull (after Houston morning)
+    // Daily TDLR + CoH radar pull (after Houston morning)
     try {
       const hourUtc = new Date().getUTCHours();
-      if (hourUtc < 13) return;
-      const { tdlrPulledToday, runTdlrPull } = await import("@/lib/integrations/tdlr/runner");
-      if (await tdlrPulledToday(db)) return;
-      console.log("[scheduler] running daily TDLR pull");
-      const results = await runTdlrPull(db);
-      console.log(`[scheduler] TDLR pull done: ${results.length} qualifying filings`);
+      if (hourUtc >= 13) {
+        const { tdlrPulledToday, runTdlrPull } = await import("@/lib/integrations/tdlr/runner");
+        if (!(await tdlrPulledToday(db))) {
+          console.log("[scheduler] running daily TDLR+CoH pull");
+          const results = await runTdlrPull(db);
+          console.log(`[scheduler] TDLR+CoH pull done: ${results.length} signals`);
+        }
+      }
     } catch (err) {
       console.error("[scheduler] TDLR pull failed:", err);
+    }
+
+    // Daily web Expansion Scout (franchises/developments/operators — radar PRD §5)
+    try {
+      const hourUtc = new Date().getUTCHours();
+      if (hourUtc >= 13) {
+        const { scoutRanToday, runExpansionScout } = await import("@/lib/integrations/scout/client");
+        if (!(await scoutRanToday(db))) {
+          console.log("[scheduler] running daily expansion scout");
+          const found = await runExpansionScout(db);
+          console.log(`[scheduler] scout done: ${found.length} discoveries fed to radar`);
+        }
+      }
+    } catch (err) {
+      console.error("[scheduler] expansion scout failed:", err);
     }
   };
 

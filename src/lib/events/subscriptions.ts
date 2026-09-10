@@ -23,6 +23,56 @@ const SUBSCRIPTIONS: Record<string, (db: Db, event: EventRow) => Promise<void>> 
       console.log(`[auto-pursue] daily cap reached — skipping ${event.opportunityId}`);
       return;
     }
+
+    // Franchise/development/portfolio suggestions auto-route to their research
+    // playbook (PB02/03/04 are research-only: entities + strategic score +
+    // recommendation; any outreach still gates through Approvals later).
+    const suggested = payload.suggestedPloybook;
+    if (suggested === "pb02" || suggested === "pb03" || suggested === "pb04") {
+      const { opportunities, accounts, projects, ploybookRuns } = await import("@/lib/db/schema");
+      const { eq } = await import("drizzle-orm");
+      const opp = await db.query.opportunities.findFirst({
+        where: eq(opportunities.id, event.opportunityId),
+      });
+      if (!opp || opp.stage !== "discovered") return;
+      const account = opp.accountId
+        ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
+        : null;
+      const project = opp.projectId
+        ? await db.query.projects.findFirst({ where: eq(projects.id, opp.projectId) })
+        : null;
+      const config =
+        suggested === "pb03"
+          ? account && { key: "pb03_franchise_expansion", payload: { brandName: account.name } }
+          : suggested === "pb04"
+            ? account && { key: "pb04_facility_portfolio", payload: { operatorName: account.name } }
+            : (project || account) && {
+                key: "pb02_commercial_development",
+                payload: {
+                  developmentName: project?.name ?? account!.name,
+                  city: project?.city ?? undefined,
+                },
+              };
+      if (!config) return;
+      const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
+      await import("@/lib/ploybooks");
+      const runId = await launchRun(db, {
+        ploybookKey: config.key,
+        triggerType: AUTO_PURSUE_TRIGGER,
+        triggerPayload: config.payload,
+        primaryEntityType: "opportunity",
+        primaryEntityId: opp.id,
+        initiatedBy: "system",
+      });
+      await db
+        .update(opportunities)
+        .set({ stage: "researching", nextAction: "Auto-researching (see run)", updatedAt: new Date() })
+        .where(eq(opportunities.id, opp.id));
+      await executeRun(db, runId);
+      void ploybookRuns; // schema import kept for future run-count guards
+      return;
+    }
+
     const result = await launchPursuit(db, event.opportunityId, {
       triggerType: AUTO_PURSUE_TRIGGER,
       initiatedBy: "system",

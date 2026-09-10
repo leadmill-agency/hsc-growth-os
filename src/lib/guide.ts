@@ -18,11 +18,12 @@ export const GENERAL_GUIDE = {
   intro:
     "Growth OS finds sign work, researches it, and prepares the next step. It never sends an email, publishes a page, or submits a bid on its own — everything external stops in Approvals and waits for a person.",
   rhythm: [
-    "Every morning the system pulls new Texas construction filings (TDLR) and scores them into Opportunities.",
+    "Every morning the system pulls new Texas construction filings (TDLR), Houston certificates of occupancy (new businesses moving in), and web-scouts franchise expansions, new developments, and multi-location operators — all scored into Opportunities.",
     "When someone we can identify visits houstonsigncrafters.com, they land in Opportunities automatically (RB2B).",
     "Anything waiting on a human shows in Approvals. Treat Approvals as your to-do list.",
     "Long jobs (research, bid analysis) run in the background for a few minutes. Refresh the page; check Ploybooks → Recent runs for progress.",
     "Pursue on an opportunity card launches the full pursuit: research, fit score, contacts, and an outreach draft in Approvals (~5 minutes). If the card says 'owner unknown', Pursue first researches who's behind the project — and tells you if it can't find out.",
+    "High scorers (75+) don't wait for a click: GC/bid signals auto-run the full pursuit, and franchise/development/operator discoveries auto-run their research playbook — drafts and recommendations appear in Approvals and on the cards by themselves (capped per day).",
   ],
   scores:
     "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't.",

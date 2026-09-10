@@ -25,7 +25,7 @@ export async function autoPursuitsToday(db: Db): Promise<number> {
     .from(ploybookRuns)
     .where(
       and(
-        eq(ploybookRuns.ploybookKey, "pb01_gc_pursuit"),
+        // Any auto-triggered research run counts against the daily budget
         eq(ploybookRuns.triggerType, AUTO_PURSUE_TRIGGER),
         gte(ploybookRuns.createdAt, startOfDay)
       )

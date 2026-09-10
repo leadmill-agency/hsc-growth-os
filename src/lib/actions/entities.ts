@@ -151,6 +151,14 @@ export async function createOpportunity(
       ),
     });
     if (existing) return { opportunity: existing, created: false as const };
+  } else if (input.accountId) {
+    // Account-level signals (e.g. "brand X expanding into Texas") recur daily —
+    // one open account-level opportunity, not one per sighting (radar PRD §19).
+    const { isNull } = await import("drizzle-orm");
+    const existing = await db.query.opportunities.findFirst({
+      where: and(eq(opportunities.accountId, input.accountId), isNull(opportunities.projectId)),
+    });
+    if (existing) return { opportunity: existing, created: false as const };
   }
   const [opportunity] = await db
     .insert(opportunities)
