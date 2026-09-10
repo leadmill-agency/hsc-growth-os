@@ -161,6 +161,26 @@ export async function runBidQaAction(formData: FormData) {
   revalidatePath("/approvals");
 }
 
+export async function uploadBidPackageAction(formData: FormData) {
+  const bidId = String(formData.get("bidId") ?? "");
+  const file = formData.get("package");
+  if (!bidId || !(file instanceof File)) return;
+  if (!file.name.toLowerCase().endsWith(".zip")) return;
+  const { MAX_UPLOAD_BYTES, extractZipToDir, storageRoot } = await import(
+    "@/lib/documents/upload"
+  );
+  if (file.size > MAX_UPLOAD_BYTES) return;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const destDir = `${storageRoot()}/uploads/${bidId}`;
+  const extracted = await extractZipToDir(buffer, destDir);
+  if (extracted === 0) return;
+  // Hand straight to the analyzer with the bid's context
+  const analyzeForm = new FormData();
+  analyzeForm.set("bidId", bidId);
+  analyzeForm.set("folderPath", destDir);
+  await analyzeBidAction(analyzeForm);
+}
+
 export async function analyzeBidAction(formData: FormData) {
   const bidId = String(formData.get("bidId") ?? "");
   const folderPath = String(formData.get("folderPath") ?? "").trim();

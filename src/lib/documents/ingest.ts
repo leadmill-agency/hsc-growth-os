@@ -106,7 +106,7 @@ export async function ingestBidFolder(
   params: { folderPath: string; bidId?: string; projectId?: string; opportunityId?: string },
   options: IngestOptions = {}
 ): Promise<IngestedDoc[]> {
-  const textDir = options.textDir ?? ".data/doc-text";
+  const textDir = options.textDir ?? `${process.env.DOC_STORAGE_DIR ?? ".data"}/doc-text`;
   const maxBytes = options.maxFileBytes ?? 60 * 1024 * 1024;
   await mkdir(textDir, { recursive: true });
 

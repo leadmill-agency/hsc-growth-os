@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { bids, opportunities, accounts } from "@/lib/db/schema";
 import { desc, inArray } from "drizzle-orm";
-import { runBidQaAction, analyzeBidAction } from "@/app/actions";
+import { runBidQaAction, uploadBidPackageAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -81,15 +81,17 @@ export default async function BidsPage() {
                       </button>
                     </form>
                     {bid.status !== "submitted" && (
-                      <form action={analyzeBidAction} className="flex items-center gap-1.5">
+                      <form action={uploadBidPackageAction} className="flex items-center gap-1.5">
                         <input type="hidden" name="bidId" value={bid.id} />
                         <input
-                          name="folderPath"
-                          placeholder="Docs folder path (on the server)"
-                          className="w-52 rounded border border-fog px-2 py-1 text-xs"
+                          type="file"
+                          name="package"
+                          accept=".zip"
+                          required
+                          className="w-52 text-xs text-steel file:mr-2 file:rounded file:border-0 file:bg-cloud file:px-2 file:py-1 file:text-xs file:font-medium file:text-ink-700"
                         />
                         <button className="rounded border border-fog bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:border-signal">
-                          Analyze
+                          Upload + analyze
                         </button>
                       </form>
                     )}

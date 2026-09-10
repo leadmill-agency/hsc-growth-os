@@ -24,9 +24,36 @@ export async function runTdlrPull(db: Db, opts: TdlrPullOptions = {}) {
     const status = await executeRun(db, runId);
     results.push({ projectNumber: project.ProjectNumber, name: project.ProjectName, status });
   }
+
+  // CoH Certificates of Occupancy ride the same daily pull (per Rameel 2026-09-10:
+  // CO = business moving in, signage likely not yet bought).
+  let cohCount = 0;
+  try {
+    const { fetchRecentOccupancyCertificates, isSignageRelevant, formatCohSignal } = await import(
+      "@/lib/integrations/coh/client"
+    );
+    const records = (await fetchRecentOccupancyCertificates({ sinceDays: opts.sinceDays ?? 2 }))
+      .filter(isSignageRelevant)
+      .slice(0, 25);
+    for (const record of records) {
+      const { signalText, sourceUrl } = formatCohSignal(record);
+      const runId = await launchRun(db, {
+        ploybookKey: "pb05_opportunity_radar",
+        triggerType: "scheduled",
+        triggerPayload: { signalText, sourceUrl, source: "coh_co" },
+        initiatedBy: "system",
+      });
+      const status = await executeRun(db, runId);
+      results.push({ projectNumber: record.permitNumber, name: record.businessName, status });
+      cohCount++;
+    }
+  } catch (err) {
+    console.error("[radar] CoH CO pull failed (TDLR results unaffected):", err);
+  }
+
   await emitEvent(db, {
     eventType: "radar.tdlr_pulled",
-    payload: { qualifying: projects.length, results },
+    payload: { qualifying: projects.length, cohCertificates: cohCount, results },
   });
   return results;
 }

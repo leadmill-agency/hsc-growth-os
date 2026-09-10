@@ -169,7 +169,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatYouGet:
       "The estimator brief (scope, sheet references, risks, RFIs, exclusions) plus supplier RFQ drafts in Approvals — send those day 1, then do the takeoff.",
     caveat:
-      "It never invents quantities — measuring stays your job. Current limitation: it reads files on the computer running the system; a file-upload button is on the roadmap, so for now hand packages to Rameel to run.",
+      "It never invents quantities — measuring stays your job. Easiest way to run it: zip the downloaded package and use 'Upload + analyze' on the Bids page.",
   },
   pb12_bid_qa: {
     key: "pb12_bid_qa",
