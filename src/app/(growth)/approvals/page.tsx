@@ -54,6 +54,9 @@ interface EmailDraft {
   alternate_body?: string;
   target_contact?: string;
   rationale?: string;
+  suggested_email?: string;
+  suggested_email_confidence?: number;
+  suggested_email_source?: string;
 }
 
 function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFormId: string }) {
@@ -63,7 +66,21 @@ function EmailDraftView({ draft, approveFormId }: { draft: EmailDraft; approveFo
       {draft.target_contact && (
         <p className="text-sm">
           <span className="font-medium">To:</span> {draft.target_contact}{" "}
-          <span className="text-xs text-steel">— paste their verified email below to send</span>
+          {draft.suggested_email ? (
+            <span className="text-xs">
+              — found <span className="font-medium">{draft.suggested_email}</span>{" "}
+              <span className={draft.suggested_email_confidence != null && draft.suggested_email_confidence >= 80 ? "text-emerald-700" : "text-amber-700"}>
+                ({draft.suggested_email_confidence ?? "?"}% confidence
+                {draft.suggested_email_confidence != null && draft.suggested_email_confidence < 80
+                  ? " — double-check before sending"
+                  : ""}
+                )
+              </span>{" "}
+              <span className="text-steel">— pre-filled below</span>
+            </span>
+          ) : (
+            <span className="text-xs text-steel">— no email found automatically; paste their verified email below to send</span>
+          )}
         </p>
       )}
       <label className="block cursor-pointer rounded-lg border border-fog bg-cloud/40 p-3 has-[:checked]:border-signal">
@@ -188,16 +205,19 @@ export default async function ApprovalsPage() {
     : [];
   const oppById = new Map(opps.map((o) => [o.id, o]));
 
-  return (
-    <div className="max-w-3xl space-y-8">
-      <h1 className="text-xl font-semibold">Approvals</h1>
+  // Two different kinds of work (per Rameel 2026-09-10): deciding on bids vs
+  // sending communications. Group them so the inbox matches how he thinks.
+  const EMAIL_TYPES = ["send_outreach", "send_followup", "send_supplier_rfqs"];
+  const bidDecisions = pending.filter((a) => a.approvalType === "accept_bid");
+  const emailsToSend = pending.filter((a) => EMAIL_TYPES.includes(a.approvalType));
+  const everythingElse = pending.filter(
+    (a) => a.approvalType !== "accept_bid" && !EMAIL_TYPES.includes(a.approvalType)
+  );
 
-      <section className="space-y-3">
-        {pending.length === 0 && <p className="text-sm text-steel">Nothing pending.</p>}
-        {pending.map((a) => {
-          const run = a.runId ? runById.get(a.runId) : null;
-          const opp = oppById.get(((a.payload ?? {}) as { opportunityId?: string }).opportunityId ?? "");
-          return (
+  const renderCard = (a: (typeof pending)[number]) => {
+    const run = a.runId ? runById.get(a.runId) : null;
+    const opp = oppById.get(((a.payload ?? {}) as { opportunityId?: string }).opportunityId ?? "");
+    return (
           <div key={a.id} className="rounded-lg border border-amber-200 bg-white p-4">
             <div className="text-xs uppercase tracking-wide text-steel/70">{a.approvalType}</div>
             <div className="mt-1 text-sm font-semibold">{a.title}</div>
@@ -258,6 +278,7 @@ export default async function ApprovalsPage() {
                   <input
                     name="recipientEmail"
                     type="email"
+                    defaultValue={((a.payload ?? {}) as { draft?: EmailDraft }).draft?.suggested_email ?? ""}
                     placeholder="Recipient email (verified) — sends on approve"
                     className="w-72 rounded border border-fog px-2 py-1 text-xs"
                   />
@@ -294,9 +315,42 @@ export default async function ApprovalsPage() {
               </form>
             </div>
           </div>
-          );
-        })}
-      </section>
+    );
+  };
+
+  return (
+    <div className="max-w-3xl space-y-8">
+      <h1 className="text-xl font-semibold">Approvals</h1>
+      {pending.length === 0 && (
+        <p className="text-sm text-steel">Nothing pending. New drafts and decisions land here.</p>
+      )}
+
+      {bidDecisions.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink-700">
+            Bid decisions ({bidDecisions.length}) — approve = we&apos;re bidding, reject = pass
+          </h2>
+          {bidDecisions.map(renderCard)}
+        </section>
+      )}
+
+      {emailsToSend.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink-700">
+            Emails to send ({emailsToSend.length}) — nothing sends without you
+          </h2>
+          {emailsToSend.map(renderCard)}
+        </section>
+      )}
+
+      {everythingElse.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-ink-700">
+            Other approvals ({everythingElse.length})
+          </h2>
+          {everythingElse.map(renderCard)}
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-semibold text-ink-700">Recently resolved</h2>

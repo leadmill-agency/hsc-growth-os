@@ -255,8 +255,47 @@ export const pb01GcPursuit: PloybookDefinition = {
         if (!ctx.approvalResolution) {
           const prior = ctx.priorOutputs["normalize_entities"];
           const fit = ctx.priorOutputs["score_fit"].fit as { score: number; recommendation: string };
-          const draft = ctx.priorOutputs["draft_outreach"].draft;
+          const draft = ctx.priorOutputs["draft_outreach"].draft as Record<string, unknown> & {
+            target_contact?: string;
+          };
           const stakeholders = ctx.priorOutputs["stakeholder_map"].stakeholders as StakeholderPlan;
+          // Look up the contact's work email (Hunter) so the approval card
+          // arrives pre-filled. Never blocks — null means the human finds it.
+          let enrichedDraft: Record<string, unknown> = draft;
+          if (draft.target_contact) {
+            try {
+              const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
+              const { accounts: accountsTable } = await import("@/lib/db/schema");
+              const { eq: eqOp } = await import("drizzle-orm");
+              const account = prior.accountId
+                ? await ctx.db.query.accounts.findFirst({
+                    where: eqOp(accountsTable.id, prior.accountId as string),
+                  })
+                : null;
+              const domain =
+                account?.domain ??
+                account?.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+              // "Dustin Jackson, President" → "Dustin Jackson"
+              const fullName = draft.target_contact.split(",")[0]?.trim();
+              const found = fullName
+                ? await findWorkEmail({
+                    fullName,
+                    domain: domain ?? undefined,
+                    company: (prior.accountName as string) ?? undefined,
+                  })
+                : null;
+              if (found) {
+                enrichedDraft = {
+                  ...draft,
+                  suggested_email: found.email,
+                  suggested_email_confidence: found.confidence,
+                  suggested_email_source: found.source,
+                };
+              }
+            } catch (err) {
+              console.warn("[pb01] email enrichment skipped:", (err as Error).message);
+            }
+          }
           return {
             kind: "needs_approval",
             approval: {
@@ -265,7 +304,7 @@ export const pb01GcPursuit: PloybookDefinition = {
               summary: `Bid-access email drafted for ${prior.projectName}. Missing stakeholder roles: ${stakeholders.missing_roles.join(", ") || "none"}.`,
               proposedAction:
                 "Approve to mark outreach ready to send. Sending itself is a separate guarded action.",
-              payload: { draft, opportunityId: prior.opportunityId },
+              payload: { draft: enrichedDraft, opportunityId: prior.opportunityId },
             },
           };
         }
