@@ -96,6 +96,35 @@ export default async function AccountDetailPage({
     limit: 5,
   });
 
+  // The TRIGGER (per Rameel 2026-09-11: "why is this account here — what is the
+  // trigger?"): the raw external signal that started the chain, from the
+  // account's opportunities. External sources only — pb-created children point
+  // back to the same original signal.
+  const externalOpps = oppRows.filter((o) =>
+    ["tdlr", "coh_co", "web_scout", "manual_signal", "email_inbound", "bid_invite", "radar"].includes(
+      o.source ?? ""
+    )
+  );
+  const triggerOpp = externalOpps[externalOpps.length - 1] ?? null; // earliest external
+  const triggerSignalRow = triggerOpp
+    ? await db.query.evidence.findFirst({
+        where: and(
+          eq(evidence.entityType, "opportunity"),
+          eq(evidence.entityId, triggerOpp.id),
+          eq(evidence.fieldName, "origin_signal")
+        ),
+      })
+    : null;
+  const triggerSourceLabels: Record<string, string> = {
+    tdlr: "a TDLR construction filing",
+    coh_co: "a new certificate of occupancy",
+    web_scout: "the daily web scan",
+    manual_signal: "a signal the team pasted in",
+    email_inbound: "a forwarded bid invite",
+    bid_invite: "a bid invitation",
+    radar: "the opportunity radar",
+  };
+
   // Where did this account come from? The creation activity names the run, the
   // run names the ploybook, and the guide gives it a human name.
   const created = activityRows.find((a) => a.action === "account.created");
@@ -179,6 +208,36 @@ export default async function AccountDetailPage({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {triggerOpp && (
+        <div className="rounded-lg border border-fog bg-white px-4 py-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+            The trigger — why this account exists
+          </div>
+          <p className="mt-1 text-sm text-ink-700">
+            Found via {triggerSourceLabels[triggerOpp.source ?? ""] ?? triggerOpp.source} on{" "}
+            {triggerOpp.createdAt.toISOString().slice(0, 10)}
+            {triggerOpp.sourceDetail && /^https?:\/\//.test(triggerOpp.sourceDetail) && (
+              <>
+                {" "}
+                ·{" "}
+                <a href={triggerOpp.sourceDetail} target="_blank" className="underline hover:text-signal">
+                  view source
+                </a>
+              </>
+            )}
+          </p>
+          {triggerSignalRow && (
+            <blockquote className="mt-2 border-l-2 border-fog pl-3 text-sm italic leading-relaxed text-steel">
+              {String(triggerSignalRow.value ?? "").slice(0, 500)}
+            </blockquote>
+          )}
+          <p className="mt-2 text-xs text-amber-800">
+            Sanity check: does the company in the brief below match the company in this signal?
+            Name collisions happen — if they don&apos;t match, dismiss or re-run Research.
+          </p>
         </div>
       )}
 
