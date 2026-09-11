@@ -252,6 +252,39 @@ export async function pursueOpportunityAction(formData: FormData) {
     return;
   }
 
+  // Research already on file (e.g. cards returned to the inbox after the
+  // 2026-09-11 reset): Pursue moves them to Researched instantly — no rerun,
+  // no cost. The account's Research button forces a fresh run when needed.
+  if (opp?.accountId) {
+    const { evidence } = await import("@/lib/db/schema");
+    const { and } = await import("drizzle-orm");
+    const existingBrief = await db.query.evidence.findFirst({
+      where: and(
+        eq(evidence.entityType, "account"),
+        eq(evidence.entityId, opp.accountId),
+        eq(evidence.fieldName, "research_brief")
+      ),
+    });
+    if (existingBrief) {
+      await db
+        .update(opportunities)
+        .set({ stage: "researched", nextAction: "Research on file — see the brief", updatedAt: new Date() })
+        .where(eq(opportunities.id, opportunityId));
+      const { logActivity } = await import("@/lib/events");
+      await logActivity(db, {
+        entityType: "opportunity",
+        entityId: opportunityId,
+        action: "opportunity.researched",
+        detail: `${opp.name} — existing research reused, moved to Researched`,
+        actor: "user",
+      });
+      revalidatePath("/opportunities");
+      revalidatePath("/researched");
+      revalidatePath("/");
+      return;
+    }
+  }
+
   const { launchPursuit } = await import("@/lib/actions/pursue");
   const result = await launchPursuit(db, opportunityId, {
     triggerType: "manual",
