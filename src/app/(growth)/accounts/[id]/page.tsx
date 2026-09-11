@@ -50,9 +50,9 @@ const launchedBanners: Record<string, string> = {
   research:
     "Research started — it runs for ~5 minutes in the background. Findings appear on this page; refresh to check in.",
   swarm:
-    "Swarm started — it finds the decision-makers and drafts outreach to each. The drafts land in Approvals in ~5 minutes; nothing sends without you.",
+    "Swarm started — it finds the decision-makers and drafts a staggered sequence to each. The sequence lands on the Researched tab in ~5 minutes for your review; nothing sends without you.",
   abm_page:
-    "Sales page build started — the draft page lands in Approvals in ~5 minutes for your review before it gets a shareable link.",
+    "Sales page build started — the draft lands on the Researched tab in ~5 minutes for your review before it gets a shareable link.",
 };
 
 export default async function AccountDetailPage({

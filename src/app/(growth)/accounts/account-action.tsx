@@ -53,7 +53,7 @@ export const ACCOUNT_ACTION_PROPS = {
   swarm: {
     which: "swarm",
     label: "Swarm",
-    title: "Draft outreach to multiple contacts at this company — drafts land in Approvals",
+    title: "Draft a staggered outreach sequence to multiple contacts — lands on the Researched tab for review",
   },
   abm_page: {
     which: "abm_page",

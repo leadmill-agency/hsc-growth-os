@@ -44,7 +44,7 @@ export default async function Home() {
     todo.push({
       label: `Review ${pendingCount.n} item${pendingCount.n === 1 ? "" : "s"} waiting for your approval`,
       detail: pendingApprovals.map((a) => a.title).slice(0, 3).join(" · "),
-      href: "/approvals",
+      href: "/researched",
       urgent: true,
     });
   }
@@ -52,7 +52,7 @@ export default async function Home() {
     todo.push({
       label: `${draftedFollowups.n} bid follow-up${draftedFollowups.n === 1 ? "" : "s"} drafted and ready to send`,
       detail: "Open each one, add the GC's email, approve to send",
-      href: "/approvals",
+      href: "/researched",
       urgent: true,
     });
   }
@@ -136,7 +136,7 @@ export default async function Home() {
                 <Link href={`/runs/${r.id}`} className="underline">
                   {r.ploybookKey}
                 </Link>{" "}
-                — {r.currentStep ?? "starting"} (a few minutes; results land in Approvals or on the cards)
+                — {r.currentStep ?? "starting"} (a few minutes; results land in Researched or on the cards)
               </li>
             ))}
           </ul>

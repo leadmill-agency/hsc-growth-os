@@ -50,7 +50,7 @@ export default function GuidePage() {
           <p className="mt-2 text-sm text-ink-700">{GENERAL_GUIDE.scores}</p>
         </div>
         <div className="rounded-lg border border-fog bg-white p-5">
-          <h2 className="text-sm font-semibold">Approvals</h2>
+          <h2 className="text-sm font-semibold">Sending emails</h2>
           <p className="mt-2 text-sm text-ink-700">{GENERAL_GUIDE.approvals}</p>
         </div>
       </section>

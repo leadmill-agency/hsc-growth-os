@@ -15,7 +15,7 @@ import {
   resolveApprovalAction,
   setOpportunityStageAction,
 } from "@/app/actions";
-import { EmailApprovalCard } from "./email-card";
+import { EmailApprovalCard, SwarmApprovalCard } from "./email-card";
 import { BidDesk } from "./bid-desk";
 
 export const dynamic = "force-dynamic";
@@ -119,11 +119,17 @@ export default async function ResearchedPage({
     }
   }
 
+  // Swarm sequences get their own readable cards.
+  const swarmApprovals = await db.query.approvals.findMany({
+    where: and(eq(approvals.status, "pending"), eq(approvals.approvalType, "swarm_outreach")),
+    orderBy: desc(approvals.requestedAt),
+  });
+
   // Anything else pending (supplier RFQs, page publishes) stays actionable here.
   const otherApprovals = await db.query.approvals.findMany({
     where: and(
       eq(approvals.status, "pending"),
-      notInArray(approvals.approvalType, [...EMAIL_TYPES, "accept_bid"])
+      notInArray(approvals.approvalType, [...EMAIL_TYPES, "accept_bid", "swarm_outreach"])
     ),
     orderBy: desc(approvals.requestedAt),
   });
@@ -326,6 +332,17 @@ export default async function ResearchedPage({
               </div>
             );
           })}
+
+          {swarmApprovals.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="text-sm font-semibold text-ink-700">
+                Swarm sequences waiting on you ({swarmApprovals.length})
+              </h2>
+              {swarmApprovals.map((a) => (
+                <SwarmApprovalCard key={a.id} approval={a} />
+              ))}
+            </section>
+          )}
 
           {unmatchedEmails.length > 0 && (
             <section className="space-y-2">

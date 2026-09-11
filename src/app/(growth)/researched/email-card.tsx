@@ -29,6 +29,62 @@ const rejectionCodes: [string, string][] = [
   ["other", "Other"],
 ];
 
+// A swarm sequence: several distinct messages to different people at one
+// account, approved as one staggered plan. Sending each remains guarded.
+export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$inferSelect }) {
+  const payload = (approval.payload ?? {}) as {
+    plan?: { sequencing_rationale?: string };
+    messages?: { contact_name: string; subject: string; body: string; day_offset: number }[];
+  };
+  const messages = payload.messages ?? [];
+  return (
+    <div className="rounded-lg border border-amber-200 bg-white p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-steel">Company swarm</div>
+      <div className="mt-1 text-sm font-semibold">{approval.title}</div>
+      {payload.plan?.sequencing_rationale && (
+        <p className="mt-1 text-sm text-steel">{payload.plan.sequencing_rationale}</p>
+      )}
+      <div className="mt-2 space-y-2">
+        {messages.map((m, i) => (
+          <div key={i} className="rounded-lg border border-fog bg-cloud/40 p-3">
+            <div className="text-xs font-semibold text-ink-700">
+              Day {m.day_offset} — to {m.contact_name}
+            </div>
+            <div className="mt-1 text-sm font-medium">{m.subject}</div>
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{m.body}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-steel">
+        Approving accepts the sequence plan. Each email still only sends when you send it —
+        nothing goes out from this click.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <form action={resolveApprovalAction}>
+          <input type="hidden" name="approvalId" value={approval.id} />
+          <input type="hidden" name="decision" value="approved" />
+          <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+            Approve the sequence
+          </button>
+        </form>
+        <form action={resolveApprovalAction} className="flex items-center gap-2">
+          <input type="hidden" name="approvalId" value={approval.id} />
+          <input type="hidden" name="decision" value="rejected" />
+          <select name="rejectionCode" defaultValue="" className="rounded border border-fog px-2 py-1 text-xs text-ink-700">
+            <option value="">Why reject? (optional)</option>
+            {rejectionCodes.map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Discard</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function EmailApprovalCard({ approval }: { approval: typeof approvals.$inferSelect }) {
   const draft = ((approval.payload ?? {}) as { draft?: EmailDraft }).draft ?? {};
   const formId = `approve-${approval.id}`;

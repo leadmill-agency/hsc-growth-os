@@ -36,7 +36,7 @@ export default async function AccountsPage() {
         brought it in, its projects, and everything researched so far. When an account looks
         worth going deeper on, use the buttons on its row:{" "}
         <span className="font-semibold">Swarm</span> drafts a multi-contact outreach sequence
-        into Approvals, <span className="font-semibold">Sales page</span> builds a
+        onto the Researched tab, <span className="font-semibold">Sales page</span> builds a
         personalized proposal page you can send them, and{" "}
         <span className="font-semibold">Research</span> builds a full profile (leadership,
         locations, recent projects). Nothing sends without your approval.
