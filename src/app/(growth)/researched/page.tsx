@@ -9,7 +9,12 @@ import {
   ploybookRuns,
 } from "@/lib/db/schema";
 import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
-import { writeEmailAction, launchAccountPloybookAction, resolveApprovalAction } from "@/app/actions";
+import {
+  writeEmailAction,
+  launchAccountPloybookAction,
+  resolveApprovalAction,
+  setOpportunityStageAction,
+} from "@/app/actions";
 import { EmailApprovalCard } from "./email-card";
 import { BidDesk } from "./bid-desk";
 
@@ -270,8 +275,9 @@ export default async function ResearchedPage({
                         </p>
                       )}
                     </div>
-                    {o.stage !== "researching" && account && (
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {o.stage !== "researching" && account && (
+                        <>
                         <form action={writeEmailAction}>
                           <input type="hidden" name="opportunityId" value={o.id} />
                           <button
@@ -297,8 +303,21 @@ export default async function ResearchedPage({
                             ABM page
                           </button>
                         </form>
-                      </div>
-                    )}
+                        </>
+                      )}
+                      {/* Not interested after reading the research? That's a
+                          valid outcome — the brief stays on the account. */}
+                      <form action={setOpportunityStageAction}>
+                        <input type="hidden" name="opportunityId" value={o.id} />
+                        <input type="hidden" name="stage" value="dismissed" />
+                        <button
+                          className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-steel hover:border-signal"
+                          title="Not interested — removes the card; the research stays on the account if they ever come back"
+                        >
+                          Dismiss
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 </div>
                 {drafts.map((a) => (
