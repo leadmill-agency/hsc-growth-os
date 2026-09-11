@@ -16,19 +16,19 @@ export interface PloybookGuide {
 
 export const GENERAL_GUIDE = {
   intro:
-    "Growth OS finds sign work, researches it, and prepares the next step. It never sends an email, publishes a page, or submits a bid on its own — everything external stops in Approvals and waits for a person.",
+    "Growth OS is a funnel: Opportunities (everything found, unreviewed) → Pursue → Researched (briefs and contacts, ready to act on). It never sends an email, publishes a page, or submits a bid on its own — you review and fire every external action yourself.",
   rhythm: [
-    "Every morning the system pulls new Texas construction filings (TDLR), Houston certificates of occupancy (new businesses moving in), and web-scouts franchise expansions, new developments, and multi-location operators — all scored into Opportunities.",
-    "When someone we can identify visits houstonsigncrafters.com, they land in Opportunities automatically (RB2B).",
-    "Anything waiting on a human shows in Approvals. Treat Approvals as your to-do list.",
-    "Long jobs (research, bid analysis) run in the background for a few minutes. Refresh the page; check Ploybooks → Recent runs for progress.",
-    "Pursue on an opportunity card launches the full pursuit: research, fit score, contacts, and an outreach draft in Approvals (~5 minutes). If the card says 'owner unknown', Pursue first researches who's behind the project — and tells you if it can't find out.",
-    "High scorers (75+) don't wait for a click: GC/bid signals auto-run the full pursuit, and franchise/development/operator discoveries auto-run their research playbook — drafts and recommendations appear in Approvals and on the cards by themselves (capped per day).",
+    "Every morning the system pulls new construction filings (TDLR, 39 counties around Houston), Houston certificates of occupancy (businesses moving in), a web scan for franchise expansions and developments, and any PlanHub bid invites forwarded from email — all scored into Opportunities. That tab is the triage inbox: everything unreviewed, best first.",
+    "On a normal card, Pursue starts the research: who's behind it, contacts, fit (~5 minutes). On an incoming bid invite the button says 'Bid this' — clicking it means we're bidding, and the bid moves to Researched → Bids Interested In. Dismiss drops a card for good.",
+    "High scorers (75+) don't wait for a click — they research themselves, best first, up to a daily budget. Finished research lands in Researched either way.",
+    "Researched → Researched Opportunities is where you act: each card has the brief, contacts, and website, plus three buttons — Write email (finds the contact's address and drafts in Ray's voice; you edit and send), Company swarm (drafts to several people at the company), and ABM page (a personalized sales page).",
+    "Researched → Bids Interested In is the bid desk: upload the plans zip for an estimator brief, Run QA before submitting, Mark submitted (starts automatic Day-2/7/14/30 follow-up drafts), then We won / We lost.",
+    "Long jobs run in the background for a few minutes. Refresh the page; Ploybooks → Recent runs shows progress.",
   ],
   scores:
-    "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't.",
+    "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't. Canopy/awning work counts statewide; signage-only work counts within ~150 miles of Houston.",
   approvals:
-    "Approving a draft means 'this is good — I'll send/publish it' or 'I did send it'. Rejecting keeps the research but stops the action. Nothing goes out by itself.",
+    "Emails never send themselves. Write email puts an editable draft on the researched card — what's in the fields when you approve (with a verified recipient) is exactly what sends, as Ray. Discarding a draft keeps the research.",
 };
 
 // (appended below via PLOYBOOK_GUIDES entries pb16–pb18)
@@ -52,8 +52,8 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It researches the company live on the web (about 5 minutes), finds the right people, checks what they require from vendors, scores the fit, and writes a short intro email.",
     whatYouGet:
-      "An approval card with the research, the people found, what's missing, and the email draft. Approve it when you're ready to send the email yourself.",
-    goodExample: "TDLR shows a $10M Houston project → Pursue → review the draft in Approvals.",
+      "A researched card with the brief, the people found, and what's missing. Hit Write email on it when you're ready — the draft appears there for you to edit and send.",
+    goodExample: "TDLR shows a $10M Houston project → Pursue → review the brief in Researched → Write email.",
     caveat: "Names found by research are unverified until checked in Apollo or LinkedIn. Never email a guessed address.",
   },
   pb02_commercial_development: {
@@ -168,7 +168,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It reads every document (a few minutes), finds the signage/awning/canopy sheets and specs, splits scope into built-in-house vs bought-from-suppliers, flags risks, and drafts supplier price requests immediately — because waiting on supplier pricing is our slowest step.",
     whatYouGet:
-      "The estimator brief (scope, sheet references, risks, RFIs, exclusions) plus supplier RFQ drafts in Approvals — send those day 1, then do the takeoff.",
+      "The estimator brief on the bid card (scope, sheet references, risks, RFIs, exclusions) plus supplier RFQ drafts in Researched — send those day 1, then do the takeoff.",
     caveat:
       "It never invents quantities — measuring stays your job. Easiest way to run it: zip the downloaded package and use 'Upload + analyze' on the Bids page.",
   },
@@ -181,7 +181,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It checks 16 items — addenda acknowledged, supplier quotes received, W-9, COI, signature, the deadline hasn't passed — and says READY or NOT READY with the blockers.",
     whatYouGet:
-      "A checklist card in Approvals. Submit the bid yourself (portal or email), then approve the card to record it. That starts the follow-up plan automatically.",
+      "A checklist card under the bid in Researched → Bids Interested In. Submit the bid yourself (portal or email), then hit Mark submitted on the bid card — that starts the follow-up plan automatically.",
   },
   pb13_bid_followup: {
     key: "pb13_bid_followup",
@@ -191,7 +191,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
       "You don't run this — it starts by itself when a bid is recorded as submitted. Day 2, 7, 14, and 30 follow-ups are scheduled automatically.",
     whatToEnter: "Nothing normally. Manual runs take a bid ID.",
     whatHappens:
-      "When a follow-up comes due, a short drafted email appears in Approvals. The day-30 one asks about the award — and if we lost, who won. Once the bid is marked won or lost, remaining follow-ups cancel themselves.",
+      "When a follow-up comes due, a short drafted email appears in Researched (with the bid). The day-30 one asks about the award — and if we lost, who won. Once the bid is marked won or lost, remaining follow-ups cancel themselves.",
     whatYouGet: "No bid ever goes silent. Approve each draft after you send it.",
   },
   pb14_deal_room: {
@@ -216,7 +216,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It first checks the live site — if a page already covers it, it stops and says so instead of creating a near-duplicate. Then it researches real local facts and writes a 1,000+ word draft where every local claim carries a source.",
     whatYouGet:
-      "A publish-ready draft in Approvals, with anything unverified listed up top to confirm first. Approving means 'good to publish' — adding it to the website is the next human step.",
+      "A publish-ready draft in Researched (bottom section), with anything unverified listed up top to confirm first. Approving means 'good to publish' — adding it to the website is the next human step.",
     caveat: "Never publish with unconfirmed claims still listed. Thin local research means a shorter local section, not invented color.",
   },
   pb17_content_builder: {
@@ -229,7 +229,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It checks we don't already answer it, researches the real answer, and writes an article that answers the question in the first paragraph. Dollar figures are never invented — anything numeric goes on a confirm-first list.",
     whatYouGet:
-      "A 700+ word draft in Approvals, plus a list of real HSC project examples to attach before publishing.",
+      "A 700+ word draft in Researched (bottom section), plus a list of real HSC project examples to attach before publishing.",
   },
   pb18_growth_operator: {
     key: "pb18_growth_operator",
