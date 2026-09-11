@@ -79,9 +79,20 @@ export async function sendExternal(db: Db, approvalId: string, message: Outbound
 
   const result = await adapter(message);
 
+  // The exact email that left the building, kept verbatim on the approval —
+  // the Sent log renders from this (per Rameel 2026-09-11).
   await db
     .update(approvals)
-    .set({ payload: { ...payload, sentAt: new Date().toISOString(), providerId: result.providerId } })
+    .set({
+      payload: {
+        ...payload,
+        sentAt: new Date().toISOString(),
+        providerId: result.providerId,
+        sentTo: message.to,
+        sentSubject: message.subject,
+        sentBody: message.body,
+      },
+    })
     .where(eq(approvals.id, approvalId));
 
   const [interaction] = await db

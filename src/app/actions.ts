@@ -80,6 +80,87 @@ export async function resolveApprovalAction(formData: FormData) {
         : undefined,
   });
 
+  // Approving a swarm sequence fans it out: each message becomes its own
+  // editable send_outreach card with a Hunter-found address — the same review/
+  // edit/send flow as Write email, one card per person (per Rameel 2026-09-11).
+  if (decision === "approved") {
+    try {
+      const { approvals, ploybookSteps, accounts } = await import("@/lib/db/schema");
+      const { and, eq } = await import("drizzle-orm");
+      const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
+      if (approval?.approvalType === "swarm_outreach") {
+        const payload = (approval.payload ?? {}) as {
+          plan?: { sequencing_rationale?: string };
+          messages?: { contact_name: string; subject: string; body: string; day_offset: number }[];
+        };
+        let accountId: string | undefined;
+        let accountName = "";
+        let domain: string | undefined;
+        if (approval.runId) {
+          const step = await db.query.ploybookSteps.findFirst({
+            where: and(
+              eq(ploybookSteps.runId, approval.runId),
+              eq(ploybookSteps.stepKey, "resolve_account")
+            ),
+          });
+          const out = (step?.outputs ?? {}) as { accountId?: string; accountName?: string };
+          accountId = out.accountId;
+          accountName = out.accountName ?? "";
+          if (accountId) {
+            const acc = await db.query.accounts.findFirst({ where: eq(accounts.id, accountId) });
+            accountName = accountName || acc?.name || "";
+            domain =
+              acc?.domain ??
+              acc?.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+          }
+        }
+        const { createApproval } = await import("@/lib/ploybooks/runner");
+        for (const m of payload.messages ?? []) {
+          let draft: Record<string, unknown> = {
+            subject: m.subject,
+            body: m.body,
+            target_contact: m.contact_name,
+            day_offset: m.day_offset,
+          };
+          try {
+            const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
+            const found = await findWorkEmail({
+              fullName: m.contact_name,
+              domain,
+              company: accountName || undefined,
+            });
+            draft = found
+              ? {
+                  ...draft,
+                  suggested_email: found.email,
+                  suggested_email_confidence: found.confidence,
+                  suggested_email_source: found.source,
+                }
+              : {
+                  ...draft,
+                  suggested_email_note: domain
+                    ? `Hunter has no email for ${m.contact_name} at ${domain} — try LinkedIn.`
+                    : `No website on file for ${accountName || "this company"} — add it on the account and use Find email.`,
+                };
+          } catch {
+            // enrichment is best-effort
+          }
+          await createApproval(db, {
+            approvalType: "send_outreach",
+            title: `Send outreach: ${accountName || "swarm"} — ${m.contact_name} (Day ${m.day_offset})`,
+            summary: payload.plan?.sequencing_rationale,
+            proposedAction:
+              "Part of the approved swarm sequence. Edit freely; approving with a verified email sends it as Ray on this message's day.",
+            payload: { draft, accountId },
+          });
+        }
+        revalidatePath("/researched");
+      }
+    } catch (err) {
+      console.error(`[swarm] fan-out failed for approval ${approvalId}:`, err);
+    }
+  }
+
   // Approve + recipient on an outreach/follow-up = actually send (guarded layer
   // still refuses unless ALLOW_EXTERNAL_SEND=true and the domain is live).
   if (decision === "approved" && recipientEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipientEmail)) {

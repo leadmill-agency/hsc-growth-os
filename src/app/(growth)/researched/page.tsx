@@ -108,9 +108,20 @@ export default async function ResearchedPage({
   });
   const emailsByOpp = new Map<string, typeof pendingEmails>();
   const unmatchedEmails: typeof pendingEmails = [];
+  const oppIdByAccount = new Map<string, string>();
+  for (const r of rows) {
+    if (r.accountId && !oppIdByAccount.has(r.accountId)) oppIdByAccount.set(r.accountId, r.id);
+  }
   for (const a of pendingEmails) {
-    const oppId = ((a.payload ?? {}) as { opportunityId?: string }).opportunityId;
-    if (oppId && oppIds.includes(oppId)) {
+    const p = (a.payload ?? {}) as { opportunityId?: string; accountId?: string };
+    // Match by opportunity, else by account (swarm fan-out cards carry accountId).
+    const oppId =
+      p.opportunityId && oppIds.includes(p.opportunityId)
+        ? p.opportunityId
+        : p.accountId
+          ? oppIdByAccount.get(p.accountId)
+          : undefined;
+    if (oppId) {
       const list = emailsByOpp.get(oppId) ?? [];
       list.push(a);
       emailsByOpp.set(oppId, list);
