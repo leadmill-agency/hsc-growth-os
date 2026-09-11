@@ -200,6 +200,7 @@ describe("Harvey Golden Path", () => {
 
   it("auto-pursues high-scoring discoveries via the event subscription (threshold + daily cap respected)", async () => {
     const { processEvents } = await import("@/lib/events/subscriptions");
+    process.env.AUTO_PURSUE_ENABLED = "true"; // opt-in since 2026-09-11
     process.env.AUTO_PURSUE_THRESHOLD = "75";
     process.env.AUTO_PURSUE_DAILY_CAP = "1";
     setLLMClientForTests(
@@ -243,6 +244,7 @@ describe("Harvey Golden Path", () => {
     const all = await db.select().from(opportunities);
     const second = all.find((o) => o.name.includes("Second"));
     expect(second?.stage).toBe("discovered"); // capped — stays for manual Pursue
+    delete process.env.AUTO_PURSUE_ENABLED;
     delete process.env.AUTO_PURSUE_THRESHOLD;
     delete process.env.AUTO_PURSUE_DAILY_CAP;
   });

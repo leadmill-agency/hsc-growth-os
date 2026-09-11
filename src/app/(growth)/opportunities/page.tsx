@@ -7,7 +7,6 @@ import {
   pullTdlrAction,
   setOpportunityStageAction,
 } from "@/app/actions";
-import { autoPursueDailyCap } from "@/lib/actions/pursue";
 
 export const dynamic = "force-dynamic";
 
@@ -163,15 +162,14 @@ export default async function OpportunitiesPage({
       <div className="rounded-lg border border-fog bg-cloud px-4 py-3 text-sm text-ink-700">
         <span className="font-semibold">How this works:</span> refreshed automatically every
         morning (~7am) from TDLR construction filings (39 counties, ~150 mi around Houston),
-        Houston certificates of occupancy, and a web scan for franchise expansions, new
-        developments, and multi-location operators — ranked best-first. Scores of 75+ research
-        themselves up to a daily budget (currently {autoPursueDailyCap()}/day — anything over
-        waits its turn tomorrow); finished research lands in{" "}
-        <span className="font-semibold">Researched</span>. Incoming PlanHub bid invites show
-        here too — <span className="font-semibold">Pursue</span> on one means we&apos;re
-        bidding it (straight to the bid desk). On everything else, Pursue starts the research
-        (~5 min) on anything the budget didn&apos;t reach;{" "}
-        <span className="font-semibold">the drafts never send without you.</span>
+        Houston certificates of occupancy, a web scan for franchise expansions, new
+        developments, and multi-location operators, and forwarded PlanHub invites — ranked
+        best-first. <span className="font-semibold">Nothing researches by itself:</span> finding
+        is automatic, choosing is yours. <span className="font-semibold">Pursue</span> starts
+        the research (~5 min; lands in <span className="font-semibold">Researched</span>) — on
+        a bid invite the button says <span className="font-semibold">Bid this</span> and moves
+        it to the bid desk. <span className="font-semibold">Dismiss</span> clears a card for
+        good.
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">

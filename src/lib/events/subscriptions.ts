@@ -16,8 +16,11 @@ const SUBSCRIPTIONS: Record<string, (db: Db, event: EventRow) => Promise<void>> 
   "opportunity.discovered": async (db, event) => {
     if (!event.opportunityId) return;
     const payload = event.payload as { score?: number; suggestedPloybook?: string };
-    const { autoPursueThreshold, autoPursueDailyCap, autoPursuitsToday, launchPursuit, AUTO_PURSUE_TRIGGER } =
+    const { autoPursueEnabled, autoPursueThreshold, autoPursueDailyCap, autoPursuitsToday, launchPursuit, AUTO_PURSUE_TRIGGER } =
       await import("@/lib/actions/pursue");
+    // Per Rameel 2026-09-11: research runs ONLY on a human Pursue click unless
+    // auto-pursue has been explicitly re-enabled.
+    if (!autoPursueEnabled()) return;
     if ((payload.score ?? 0) < autoPursueThreshold()) return;
     if ((await autoPursuitsToday(db)) >= autoPursueDailyCap()) {
       // Out of budget today — put the event back so tomorrow's tick retries it

@@ -76,6 +76,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  delete process.env.AUTO_PURSUE_ENABLED;
   setLLMClientForTests(null);
   setResearchProviderForTests(null);
   delete process.env.AUTO_PURSUE_THRESHOLD;
@@ -97,6 +98,7 @@ describe("Expansion Scout → radar → auto PB03", () => {
   });
 
   it("auto-routes the high-scoring franchise discovery into PB03 research (zero clicks)", async () => {
+    process.env.AUTO_PURSUE_ENABLED = "true"; // opt-in since 2026-09-11
     process.env.AUTO_PURSUE_THRESHOLD = "75";
     await runExpansionScout(db, { maxQueries: 1, maxSignals: 5 });
     await processEvents(db); // the scheduler's event pass

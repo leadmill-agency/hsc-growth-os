@@ -59,7 +59,7 @@ export default async function Home() {
   if (decisionsWaiting.n > 0) {
     todo.push({
       label: `${decisionsWaiting.n} new opportunit${decisionsWaiting.n === 1 ? "y" : "ies"} need a yes/no`,
-      detail: "High scorers research themselves — these are the ones waiting on your judgment",
+      detail: "Nothing researches by itself — Pursue the ones worth going deeper on, Dismiss the rest",
       href: "/opportunities",
       urgent: false,
     });

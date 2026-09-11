@@ -20,7 +20,7 @@ export const GENERAL_GUIDE = {
   rhythm: [
     "Every morning the system pulls new construction filings (TDLR, 39 counties around Houston), Houston certificates of occupancy (businesses moving in), a web scan for franchise expansions and developments, and any PlanHub bid invites forwarded from email — all scored into Opportunities. That tab is the triage inbox: everything unreviewed, best first.",
     "On a normal card, Pursue starts the research: who's behind it, contacts, fit (~5 minutes). On an incoming bid invite the button says 'Bid this' — clicking it means we're bidding, and the bid moves to Researched → Bids Interested In. Dismiss drops a card for good.",
-    "High scorers (75+) don't wait for a click — they research themselves, best first, up to a daily budget. Finished research lands in Researched either way.",
+    "Nothing researches by itself. The system finds and scores; you choose. Every Pursue click is one research run (~5 minutes, a few dozen cents) that lands in Researched.",
     "Researched → Researched Opportunities is where you act: each card has the brief, contacts, and website, plus three buttons — Write email (finds the contact's address and drafts in Ray's voice; you edit and send), Company swarm (drafts to several people at the company), and ABM page (a personalized sales page).",
     "Researched → Bids Interested In is the bid desk: upload the plans zip for an estimator brief, Run QA before submitting, Mark submitted (starts automatic Day-2/7/14/30 follow-up drafts), then We won / We lost.",
     "Long jobs run in the background for a few minutes. Refresh the page; Ploybooks → Recent runs shows progress.",

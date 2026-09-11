@@ -2,12 +2,16 @@ import type { Db } from "@/lib/db/client";
 import { opportunities, accounts, projects, ploybookRuns } from "@/lib/db/schema";
 import { and, count, eq, gte } from "drizzle-orm";
 
-// Shared pursuit launcher — used by the Pursue button AND the auto-pursue
-// subscription (per Rameel 2026-09-10: high-scoring discoveries shouldn't wait
-// for a click; research runs automatically and the DRAFT waits in Approvals —
-// the human gate moves from "start research" to "send anything").
+// Shared pursuit launcher — used by the Pursue button and (only when explicitly
+// enabled) the auto-pursue subscription. Per Rameel 2026-09-11: NOTHING
+// researches by itself — triage is the human's judgment step, so auto-pursue is
+// OFF unless AUTO_PURSUE_ENABLED=true is set deliberately.
 
 export const AUTO_PURSUE_TRIGGER = "event:auto_pursue";
+
+export function autoPursueEnabled(): boolean {
+  return process.env.AUTO_PURSUE_ENABLED === "true";
+}
 
 export function autoPursueThreshold(): number {
   return Number(process.env.AUTO_PURSUE_THRESHOLD ?? 75);
