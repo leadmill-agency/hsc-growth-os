@@ -37,6 +37,15 @@ export const pb09AccountResearch: PloybookDefinition = {
           accountName: prior.accountName as string,
           ploybookRunId: ctx.runId,
         });
+        // The readable brief the account page renders whole (2026-09-11).
+        const { saveAccountResearchBrief, briefFromResearch } = await import(
+          "@/lib/actions/research-brief"
+        );
+        await saveAccountResearchBrief(ctx.db, {
+          accountId: prior.accountId as string,
+          ploybookRunId: ctx.runId,
+          brief: briefFromResearch(brief, sources.map((s) => s.url), "pb09_account_research"),
+        });
         return { kind: "completed", outputs: { brief, sources } };
       },
     },

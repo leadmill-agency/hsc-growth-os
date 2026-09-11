@@ -111,7 +111,21 @@ export default async function AccountDetailPage({
       ? "added by the team"
       : null;
 
-  const scoredEvidence = evidenceRows.filter((e) => e.fieldName !== "invitation");
+  // The narrative research brief renders as its own section, not a raw fact.
+  const briefRow = evidenceRows.find((e) => e.fieldName === "research_brief");
+  const researchBrief = (briefRow?.value ?? null) as {
+    headline?: string;
+    about?: string;
+    footprint?: string[];
+    signals?: string[];
+    projects?: { name: string; detail: string }[];
+    recommendation?: string | null;
+    unknowns?: string[];
+    sources?: string[];
+  } | null;
+  const scoredEvidence = evidenceRows.filter(
+    (e) => e.fieldName !== "invitation" && e.fieldName !== "research_brief"
+  );
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -188,6 +202,79 @@ export default async function AccountDetailPage({
           </div>
         ))}
       </section>
+
+      {researchBrief && (
+        <section className="rounded-lg border border-signal/30 bg-white p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold">Research brief</h2>
+            {briefRow && (
+              <span className="text-xs text-steel">{briefRow.retrievedAt.toISOString().slice(0, 10)}</span>
+            )}
+          </div>
+          {researchBrief.about && (
+            <p className="mt-2 text-sm leading-relaxed text-ink-700">{researchBrief.about}</p>
+          )}
+          {(researchBrief.footprint?.length ?? 0) > 0 && (
+            <div className="mt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+                Where they are
+              </div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+                {researchBrief.footprint!.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(researchBrief.signals?.length ?? 0) > 0 && (
+            <div className="mt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+                What&apos;s happening
+              </div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+                {researchBrief.signals!.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(researchBrief.projects?.length ?? 0) > 0 && (
+            <div className="mt-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-steel">
+                Projects spotted
+              </div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-sm text-ink-700">
+                {researchBrief.projects!.map((p, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{p.name}</span>
+                    {p.detail && <span className="text-steel"> — {p.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {researchBrief.recommendation && (
+            <p className="mt-3 rounded bg-cloud px-3 py-2 text-sm font-medium text-ink">
+              How to approach: <span className="font-normal">{researchBrief.recommendation}</span>
+            </p>
+          )}
+          {(researchBrief.unknowns?.length ?? 0) > 0 && (
+            <p className="mt-2 text-xs text-steel">
+              Still unknown: {researchBrief.unknowns!.join(" · ")}
+            </p>
+          )}
+          {(researchBrief.sources?.length ?? 0) > 0 && (
+            <p className="mt-2 text-xs text-steel">
+              Sources:{" "}
+              {researchBrief.sources!.slice(0, 5).map((s, i) => (
+                <a key={i} href={s} target="_blank" className="mr-2 underline hover:text-signal">
+                  [{i + 1}]
+                </a>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
 
       {account.notes && (
         <section className="rounded-lg border border-fog bg-white p-4">

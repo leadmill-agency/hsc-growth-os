@@ -161,6 +161,15 @@ export const pb01GcPursuit: PloybookDefinition = {
           projectContext: `Project: ${prior.projectName}. Trade: signage/awnings.`,
           ploybookRunId: ctx.runId,
         });
+        // The readable brief the account page renders whole (2026-09-11).
+        const { saveAccountResearchBrief, briefFromResearch } = await import(
+          "@/lib/actions/research-brief"
+        );
+        await saveAccountResearchBrief(ctx.db, {
+          accountId: prior.accountId as string,
+          ploybookRunId: ctx.runId,
+          brief: briefFromResearch(brief, sources.map((s) => s.url), "pb01_gc_pursuit"),
+        });
         return { kind: "completed", outputs: { brief, sources } };
       },
     },

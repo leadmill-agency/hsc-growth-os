@@ -227,6 +227,16 @@ export const pb03FranchiseExpansion: PloybookDefinition = {
           detail: `${recommendation.motion} (${children.length} child opportunities)`,
           ploybookRunId: ctx.runId,
         });
+        // The readable brief the account page renders whole (2026-09-11).
+        const { saveAccountResearchBrief, briefFromBrand } = await import(
+          "@/lib/actions/research-brief"
+        );
+        const sources = (ctx.priorOutputs["research_footprint"].sources ?? []) as { url: string }[];
+        await saveAccountResearchBrief(ctx.db, {
+          accountId: prior.accountId as string,
+          ploybookRunId: ctx.runId,
+          brief: briefFromBrand(profile, recommendation.motion, sources.map((s) => s.url)),
+        });
         return { kind: "completed", outputs: { recommendation } };
       },
     },

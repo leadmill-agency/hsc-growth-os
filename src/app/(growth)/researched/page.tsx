@@ -75,6 +75,23 @@ export default async function ResearchedPage({
     if (!whyByOpp.has(row.entityId)) whyByOpp.set(row.entityId, String(row.value ?? ""));
   }
 
+  // The narrative research brief per account (rendered in full on the account page).
+  const briefRows = accountIds.length
+    ? await db.query.evidence.findMany({
+        where: and(
+          eq(evidence.entityType, "account"),
+          eq(evidence.fieldName, "research_brief"),
+          inArray(evidence.entityId, accountIds)
+        ),
+        orderBy: desc(evidence.retrievedAt),
+      })
+    : [];
+  const briefByAccount = new Map<string, { about?: string; recommendation?: string | null }>();
+  for (const row of briefRows) {
+    if (!briefByAccount.has(row.entityId))
+      briefByAccount.set(row.entityId, row.value as { about?: string; recommendation?: string | null });
+  }
+
   // Pending email drafts, matched to their opportunity when possible.
   const pendingEmails = await db.query.approvals.findMany({
     where: and(eq(approvals.status, "pending"), inArray(approvals.approvalType, EMAIL_TYPES)),
@@ -212,7 +229,22 @@ export default async function ResearchedPage({
                         )}
                       </div>
                       {o.nextAction && <p className="mt-1 text-xs text-steel">{o.nextAction}</p>}
-                      {why && <p className="mt-2 text-sm text-ink-700">{why}</p>}
+                      {(() => {
+                        const b = o.accountId ? briefByAccount.get(o.accountId) : null;
+                        if (b?.about)
+                          return (
+                            <p className="mt-2 text-sm leading-relaxed text-ink-700">
+                              {b.about}
+                              {b.recommendation && (
+                                <span className="mt-1 block text-xs font-medium text-ink">
+                                  How to approach:{" "}
+                                  <span className="font-normal text-steel">{b.recommendation}</span>
+                                </span>
+                              )}
+                            </p>
+                          );
+                        return why ? <p className="mt-2 text-sm text-ink-700">{why}</p> : null;
+                      })()}
                       {people.length > 0 ? (
                         <div className="mt-2 space-y-0.5 text-sm">
                           {people.map((c) => (

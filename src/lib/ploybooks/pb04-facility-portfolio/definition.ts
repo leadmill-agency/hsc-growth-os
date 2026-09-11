@@ -229,6 +229,16 @@ export const pb04FacilityPortfolio: PloybookDefinition = {
           detail: recommendation.motion,
           ploybookRunId: ctx.runId,
         });
+        // The readable brief the account page renders whole (2026-09-11).
+        const { saveAccountResearchBrief, briefFromPortfolio } = await import(
+          "@/lib/actions/research-brief"
+        );
+        const sources = (ctx.priorOutputs["research_portfolio"].sources ?? []) as { url: string }[];
+        await saveAccountResearchBrief(ctx.db, {
+          accountId: prior.accountId as string,
+          ploybookRunId: ctx.runId,
+          brief: briefFromPortfolio(profile, recommendation, sources.map((s) => s.url)),
+        });
         return { kind: "completed", outputs: { recommendation } };
       },
     },
