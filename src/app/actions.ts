@@ -220,6 +220,38 @@ export async function submitSignalAction(formData: FormData) {
 export async function pursueOpportunityAction(formData: FormData) {
   const opportunityId = String(formData.get("opportunityId") ?? "");
   const db = await getDb();
+  const { opportunities, bids } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const opp = await db.query.opportunities.findFirst({ where: eq(opportunities.id, opportunityId) });
+
+  // Incoming-bid cards: Pursue = "we're bidding this" — straight to the bid
+  // desk (Researched → Bids Interested In), no research run needed.
+  if (opp && ["incoming_bid", "bid"].includes(opp.opportunityType ?? "")) {
+    await db
+      .update(opportunities)
+      .set({ stage: "bidding", nextAction: null, updatedAt: new Date() })
+      .where(eq(opportunities.id, opportunityId));
+    const bid = await db.query.bids.findFirst({ where: eq(bids.opportunityId, opportunityId) });
+    if (bid && bid.status === "invited") {
+      await db
+        .update(bids)
+        .set({ status: "estimating", updatedAt: new Date() })
+        .where(eq(bids.id, bid.id));
+    }
+    const { logActivity } = await import("@/lib/events");
+    await logActivity(db, {
+      entityType: "opportunity",
+      entityId: opportunityId,
+      action: "bid.interested",
+      detail: `${opp.name} — moved to the bid desk`,
+      actor: "user",
+    });
+    revalidatePath("/opportunities");
+    revalidatePath("/researched");
+    revalidatePath("/");
+    return;
+  }
+
   const { launchPursuit } = await import("@/lib/actions/pursue");
   const result = await launchPursuit(db, opportunityId, {
     triggerType: "manual",
@@ -228,8 +260,89 @@ export async function pursueOpportunityAction(formData: FormData) {
   if (result.runId) executeInBackground(db, result.runId);
   revalidatePath("/opportunities");
   revalidatePath("/ploybooks");
-  revalidatePath("/approvals");
+  revalidatePath("/researched");
   revalidatePath("/");
+}
+
+// "Write email" on a researched card (per Rameel 2026-09-10): find the email
+// (Hunter), draft in the owner's voice from the run's own research, and put an
+// editable draft on the card. Sending stays a separate explicit step.
+export async function writeEmailAction(formData: FormData) {
+  const opportunityId = String(formData.get("opportunityId") ?? "");
+  if (!opportunityId) return;
+  const db = await getDb();
+  const { ploybookRuns, ploybookSteps, accounts, opportunities } = await import("@/lib/db/schema");
+  const { and, eq, desc, inArray, sql } = await import("drizzle-orm");
+  const run = await db.query.ploybookRuns.findFirst({
+    where: and(
+      eq(ploybookRuns.ploybookKey, "pb01_gc_pursuit"),
+      sql`${ploybookRuns.triggerPayload}->>'opportunityId' = ${opportunityId}`
+    ),
+    orderBy: desc(ploybookRuns.createdAt),
+  });
+  const opp = await db.query.opportunities.findFirst({ where: eq(opportunities.id, opportunityId) });
+  const account = opp?.accountId
+    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
+    : null;
+  if (!run || !opp || !account) return;
+  const steps = await db.query.ploybookSteps.findMany({
+    where: and(
+      eq(ploybookSteps.runId, run.id),
+      inArray(ploybookSteps.stepKey, ["research", "stakeholder_map", "score_fit"])
+    ),
+  });
+  const byKey = new Map(steps.map((s) => [s.stepKey, s.outputs as Record<string, unknown>]));
+  const brief = byKey.get("research")?.brief;
+  const stakeholders = byKey.get("stakeholder_map")?.stakeholders as
+    | { people: { name?: string; title?: string }[] }
+    | undefined;
+  if (!brief || !stakeholders) return;
+
+  const { draftOutreach } = await import("@/lib/actions/outreach");
+  const draft = (await draftOutreach({
+    accountName: account.name,
+    projectName: opp.name,
+    brief: brief as never,
+    stakeholders: stakeholders as never,
+  })) as Record<string, unknown> & { target_contact?: string };
+
+  // Hunter enrichment — pre-fill the send field when we can.
+  let enriched: Record<string, unknown> = draft;
+  try {
+    const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
+    const domain =
+      account.domain ??
+      account.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+    const fullName = draft.target_contact?.split(",")[0]?.trim();
+    const found = fullName
+      ? await findWorkEmail({ fullName, domain: domain ?? undefined, company: account.name })
+      : null;
+    enriched = found
+      ? {
+          ...draft,
+          suggested_email: found.email,
+          suggested_email_confidence: found.confidence,
+          suggested_email_source: found.source,
+        }
+      : {
+          ...draft,
+          suggested_email_note: domain
+            ? `Hunter has no email for ${fullName ?? "this contact"} at ${domain} — try LinkedIn.`
+            : `No website on file for ${account.name} — add it on the account page and retry.`,
+        };
+  } catch {
+    // enrichment is best-effort
+  }
+
+  const { createApproval } = await import("@/lib/ploybooks/runner");
+  await createApproval(db, {
+    approvalType: "send_outreach",
+    title: `Send outreach: ${account.name}`,
+    summary: `Drafted on request from the Researched tab for ${opp.name}.`,
+    proposedAction: "Review/edit the draft; approving with an email sends it as Ray.",
+    payload: { draft: enriched, opportunityId },
+  });
+  revalidatePath("/researched");
 }
 
 // Manual stage control on opportunity cards (per Rameel 2026-09-10: "we
@@ -247,6 +360,17 @@ export async function setOpportunityStageAction(formData: FormData) {
     .set({ stage, nextAction: null, updatedAt: new Date() })
     .where(eq(opportunities.id, opportunityId))
     .returning();
+  // A dismissed/lost bid card also passes its bid on the bid desk.
+  if (updated && ["dismissed", "lost"].includes(stage)) {
+    const { bids } = await import("@/lib/db/schema");
+    const bid = await db.query.bids.findFirst({ where: eq(bids.opportunityId, opportunityId) });
+    if (bid && !["won", "lost", "passed"].includes(bid.status)) {
+      await db
+        .update(bids)
+        .set({ status: "passed", updatedAt: new Date() })
+        .where(eq(bids.id, bid.id));
+    }
+  }
   if (updated) {
     const { logActivity, emitEvent } = await import("@/lib/events");
     await logActivity(db, {

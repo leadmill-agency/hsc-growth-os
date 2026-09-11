@@ -73,6 +73,12 @@ const SUBSCRIPTIONS: Record<string, (db: Db, event: EventRow) => Promise<void>> 
         .set({ stage: "researching", nextAction: "Auto-researching (see run)", updatedAt: new Date() })
         .where(eq(opportunities.id, opp.id));
       await executeRun(db, runId);
+      // PB02/03/04 have no finalize step of their own — land the card in the
+      // Researched tab once the run is done.
+      await db
+        .update(opportunities)
+        .set({ stage: "researched", nextAction: "Research ready — review in Researched", updatedAt: new Date() })
+        .where(eq(opportunities.id, opp.id));
       void ploybookRuns; // schema import kept for future run-count guards
       return;
     }

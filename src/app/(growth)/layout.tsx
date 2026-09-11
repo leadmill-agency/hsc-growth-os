@@ -3,13 +3,14 @@ import Link from "next/link";
 // Internal Growth OS shell — HSC-branded: ink sidebar, signal-blue accent,
 // Oswald wordmark. Customer-facing routes (/p/*) render outside this group.
 
+// The funnel (per Rameel 2026-09-10): Opportunities = unreviewed triage from
+// every source → Pursue → Researched = briefs/contacts + bid desk, where the
+// action happens. Account detail pages stay linked from researched cards.
 const nav = [
   { href: "/", label: "Home" },
   { href: "/opportunities", label: "Opportunities" },
-  { href: "/accounts", label: "Accounts" },
-  { href: "/bids", label: "Bids" },
+  { href: "/researched", label: "Researched" },
   { href: "/ploybooks", label: "Ploybooks" },
-  { href: "/approvals", label: "Approvals" },
   { href: "/guide", label: "Guide" },
   { href: "/history", label: "History" },
 ];

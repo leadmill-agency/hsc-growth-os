@@ -230,106 +230,37 @@ export const pb01GcPursuit: PloybookDefinition = {
       },
     },
     {
-      key: "draft_outreach",
-      name: "Draft outreach",
+      key: "finalize_research",
+      name: "Mark research complete",
       async run(ctx) {
+        // New flow (per Rameel 2026-09-10): PB01 ends at the research brief —
+        // contacts, fit, readiness. Email drafting is on-demand from the
+        // Researched tab ("Write email"), never automatic.
         const prior = ctx.priorOutputs["normalize_entities"];
-        const brief = ctx.priorOutputs["research"].brief as ResearchBrief;
-        const stakeholders = ctx.priorOutputs["stakeholder_map"].stakeholders as StakeholderPlan;
-        const draft = await draftOutreach({
-          accountName: prior.accountName as string,
-          projectName: prior.projectName as string,
-          brief,
-          stakeholders,
-        });
-        if (draft.word_count > 150) {
-          throw new Error(`Outreach draft too long (${draft.word_count} words; max 150)`);
-        }
-        return { kind: "completed", outputs: { draft } };
-      },
-    },
-    {
-      key: "approval_bundle",
-      name: "Request approval to send outreach",
-      async run(ctx) {
-        if (!ctx.approvalResolution) {
-          const prior = ctx.priorOutputs["normalize_entities"];
-          const fit = ctx.priorOutputs["score_fit"].fit as { score: number; recommendation: string };
-          const draft = ctx.priorOutputs["draft_outreach"].draft as Record<string, unknown> & {
-            target_contact?: string;
-          };
-          const stakeholders = ctx.priorOutputs["stakeholder_map"].stakeholders as StakeholderPlan;
-          // Look up the contact's work email (Hunter) so the approval card
-          // arrives pre-filled. Never blocks — null means the human finds it.
-          let enrichedDraft: Record<string, unknown> = draft;
-          if (draft.target_contact) {
-            try {
-              const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
-              const { accounts: accountsTable } = await import("@/lib/db/schema");
-              const { eq: eqOp } = await import("drizzle-orm");
-              const account = prior.accountId
-                ? await ctx.db.query.accounts.findFirst({
-                    where: eqOp(accountsTable.id, prior.accountId as string),
-                  })
-                : null;
-              const domain =
-                account?.domain ??
-                account?.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-              // "Dustin Jackson, President" → "Dustin Jackson"
-              const fullName = draft.target_contact.split(",")[0]?.trim();
-              const found = fullName
-                ? await findWorkEmail({
-                    fullName,
-                    domain: domain ?? undefined,
-                    company: (prior.accountName as string) ?? undefined,
-                  })
-                : null;
-              if (found) {
-                enrichedDraft = {
-                  ...draft,
-                  suggested_email: found.email,
-                  suggested_email_confidence: found.confidence,
-                  suggested_email_source: found.source,
-                };
-              }
-            } catch (err) {
-              console.warn("[pb01] email enrichment skipped:", (err as Error).message);
-            }
-          }
-          return {
-            kind: "needs_approval",
-            approval: {
-              approvalType: "send_outreach",
-              title: `Send outreach: ${prior.accountName} (fit ${fit.score}, ${fit.recommendation})`,
-              summary: `Bid-access email drafted for ${prior.projectName}. Missing stakeholder roles: ${stakeholders.missing_roles.join(", ") || "none"}.`,
-              proposedAction:
-                "Approve to mark outreach ready to send. Sending itself is a separate guarded action.",
-              payload: { draft: enrichedDraft, opportunityId: prior.opportunityId },
-            },
-          };
-        }
-        return { kind: "completed", outputs: { decision: ctx.approvalResolution.status } };
-      },
-    },
-    {
-      key: "record_outcome",
-      name: "Record pursuit state",
-      async run(ctx) {
-        const prior = ctx.priorOutputs["normalize_entities"];
-        const decision = ctx.priorOutputs["approval_bundle"].decision as string;
+        const fit = ctx.priorOutputs["score_fit"].fit as { score: number; recommendation: string };
         const opportunityId = prior.opportunityId as string;
-        const newStage = decision === "rejected" ? "qualified" : "pursuing";
         await ctx.db
           .update(opportunities)
-          .set({ stage: newStage, updatedAt: new Date() })
+          .set({
+            stage: "researched",
+            nextAction: `Research ready (fit ${fit.score}, ${fit.recommendation}) — review in Researched`,
+            updatedAt: new Date(),
+          })
           .where(eq(opportunities.id, opportunityId));
         await emitEvent(ctx.db, {
-          eventType: decision === "rejected" ? "outreach.rejected" : "outreach.approved",
+          eventType: "opportunity.researched",
           opportunityId,
           accountId: prior.accountId as string,
           ploybookRunId: ctx.runId,
         });
-        return { kind: "completed", outputs: { stage: newStage, decision } };
+        await logActivity(ctx.db, {
+          entityType: "opportunity",
+          entityId: opportunityId,
+          action: "opportunity.researched",
+          detail: `${prior.accountName} — brief, contacts, and fit ready for review`,
+          ploybookRunId: ctx.runId,
+        });
+        return { kind: "completed", outputs: { stage: "researched" } };
       },
     },
   ],

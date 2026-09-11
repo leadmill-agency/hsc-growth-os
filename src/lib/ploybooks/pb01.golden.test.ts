@@ -79,7 +79,7 @@ describe("Harvey Golden Path", () => {
     expect(await db.select().from(accounts)).toHaveLength(1);
   });
 
-  it("PB01 runs the full pursuit to approval and completion without duplicating entities", async () => {
+  it("PB01 runs the full pursuit to a finished research brief without duplicating entities", async () => {
     // Radar first (as in the real flow), then Pursue launches PB01 on the same entities.
     const radarRun = await launchRun(db, {
       ploybookKey: "pb05_opportunity_radar",
@@ -98,7 +98,7 @@ describe("Harvey Golden Path", () => {
       },
       initiatedBy: "rameel",
     });
-    expect(await executeRun(db, runId)).toBe("waiting_for_approval");
+    expect(await executeRun(db, runId)).toBe("completed");
 
     // AC1: one deduplicated account/project/opportunity (radar already created them)
     expect(await db.select().from(accounts)).toHaveLength(1);
@@ -113,24 +113,17 @@ describe("Harvey Golden Path", () => {
     expect(contactRows[0].roleType).toBe("preconstruction");
     expect(contactRows[0].verifiedAt).toBeNull(); // research contacts are unverified until checked
 
+    // New flow (2026-09-10): PB01 ends at the research brief — NO automatic
+    // outreach draft, NO approval. Email drafting is on-demand from Researched.
     const pending = await db.query.approvals.findFirst({ where: eq(approvals.runId, runId) });
-    expect(pending?.approvalType).toBe("send_outreach");
-    expect(pending?.summary).toContain("estimator");
+    expect(pending).toBeUndefined();
 
-    // AC4: draft is short and stored in the approval payload
-    const payload = pending?.payload as { draft: { body: string; word_count: number } };
-    expect(payload.draft.word_count).toBeLessThanOrEqual(150);
-    expect(payload.draft.body).not.toMatch(/instant quote|free quote today/i);
-
-    // Approve → run completes, opportunity moves to pursuing, event emitted
-    expect(await resolveApproval(db, pending!.id, "approved", { resolvedBy: "rameel" })).toBe(
-      "completed"
-    );
     const [after] = await db.select().from(opportunities);
-    expect(after.stage).toBe("pursuing");
+    expect(after.stage).toBe("researched");
+    expect(after.nextAction).toContain("Researched");
 
     const emitted = await db.select().from(events);
-    expect(emitted.map((e) => e.eventType)).toContain("outreach.approved");
+    expect(emitted.map((e) => e.eventType)).toContain("opportunity.researched");
   });
 
   it("PB05 anchors a no-company permit signal on the project instead of dropping or fabricating", async () => {
@@ -183,7 +176,7 @@ describe("Harvey Golden Path", () => {
     const [ownerless] = await db.select().from(opportunities);
     expect(ownerless.accountId).toBeNull();
 
-    // Pursue → identify owner → continue to the approval gate
+    // Pursue → identify owner → continue through to the finished brief
     const runId = await launchRun(db, {
       ploybookKey: "pb01_gc_pursuit",
       triggerPayload: {
@@ -193,7 +186,7 @@ describe("Harvey Golden Path", () => {
         opportunityId: ownerless.id,
       },
     });
-    expect(await executeRun(db, runId)).toBe("waiting_for_approval");
+    expect(await executeRun(db, runId)).toBe("completed");
 
     // Same opportunity row adopted (no duplicate), account resolved with the right type
     const opps = await db.select().from(opportunities);
@@ -229,11 +222,11 @@ describe("Harvey Golden Path", () => {
     // …and the scheduler's event pass auto-pursues it without any click.
     await processEvents(db);
     const [opp] = await db.select().from(opportunities);
-    expect(opp.stage).toBe("researching"); // pursuit started with zero clicks
+    expect(opp.stage).toBe("researched"); // pursuit ran to a finished brief, zero clicks
     const pending = await db.query.approvals.findFirst({
       where: eq(approvals.approvalType, "send_outreach"),
     });
-    expect(pending).toBeTruthy(); // the draft is already waiting in Approvals
+    expect(pending).toBeUndefined(); // no auto-drafted email — Write email is on-demand
 
     // Cap = 1: a second high scorer today is NOT auto-pursued
     setLLMClientForTests(
@@ -268,16 +261,14 @@ describe("Harvey Golden Path", () => {
     expect(await db.select().from(accounts)).toHaveLength(0); // nothing fabricated
   });
 
-  it("PB01 records a rejection without losing the research", async () => {
+  it("PB01 preserves research artifacts on the account for later action", async () => {
     const runId = await launchRun(db, {
       ploybookKey: "pb01_gc_pursuit",
       triggerPayload: { gcName: "Harvey Cleary", projectName: "UH Engineering Building" },
     });
-    await executeRun(db, runId);
-    const pending = await db.query.approvals.findFirst({ where: eq(approvals.runId, runId) });
-    expect(await resolveApproval(db, pending!.id, "rejected")).toBe("completed");
-    const [opp] = await db.select().from(opportunities);
-    expect(opp.stage).toBe("qualified"); // held, not discarded
+    expect(await executeRun(db, runId)).toBe("completed");
     expect(await db.select().from(contacts)).toHaveLength(1); // research preserved
+    const [opp] = await db.select().from(opportunities);
+    expect(opp.stage).toBe("researched");
   });
 });

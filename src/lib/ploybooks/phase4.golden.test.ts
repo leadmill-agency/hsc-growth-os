@@ -121,13 +121,15 @@ describe("document ingestion", () => {
 });
 
 describe("PB10 — Incoming Bid (real RTG invite)", () => {
-  it("parses the invite, creates tracked bid with due dates, gates BID/REVIEW, activates on approval", async () => {
+  it("parses the invite into a triage card: tracked bid, due dates, recommendation — no approval", async () => {
     setLLMClientForTests(new FixtureLLMClient({ structured: () => rtgInviteParse }));
     const runId = await launchRun(db, {
       ploybookKey: "pb10_incoming_bid",
       triggerPayload: { inviteText: rtgInviteText, source: "email" },
     });
-    expect(await executeRun(db, runId)).toBe("waiting_for_approval");
+    // New flow (2026-09-10): invites are triage cards in Opportunities, not
+    // approvals — the run completes with the recommendation on the records.
+    expect(await executeRun(db, runId)).toBe("completed");
 
     const [gc] = await db.select().from(accounts);
     expect(gc.name).toBe("C.A. Walker Construction");
@@ -136,27 +138,15 @@ describe("PB10 — Incoming Bid (real RTG invite)", () => {
     expect(bid.internalDueAt!.getTime()).toBeLessThan(bid.dueAt!.getTime()); // internal buffer
     expect(bid.notes).toContain("bids@cawalker.net");
     expect(bid.notes).toContain("Jamal");
+    expect(bid.notes).toContain("REVIEW"); // "likely" relevance → REVIEW recommendation
+    expect(bid.status).toBe("invited"); // stays invited until Pursue ("Bid this")
 
     const pending = await db.query.approvals.findFirst({ where: eq(approvals.runId, runId) });
-    expect(pending?.title).toContain("REVIEW"); // "likely" relevance → REVIEW
-    expect(pending?.summary).toContain("wall hung canopies");
+    expect(pending).toBeUndefined();
 
-    expect(await resolveApproval(db, pending!.id, "approved")).toBe("completed");
-    const [after] = await db.select().from(bids);
-    expect(after.status).toBe("estimating");
-  });
-
-  it("marks the bid passed on rejection", async () => {
-    setLLMClientForTests(new FixtureLLMClient({ structured: () => rtgInviteParse }));
-    const runId = await launchRun(db, {
-      ploybookKey: "pb10_incoming_bid",
-      triggerPayload: { inviteText: rtgInviteText },
-    });
-    await executeRun(db, runId);
-    const pending = await db.query.approvals.findFirst({ where: eq(approvals.runId, runId) });
-    await resolveApproval(db, pending!.id, "rejected");
-    const [bid] = await db.select().from(bids);
-    expect(bid.status).toBe("passed");
+    const [opp] = await db.select().from(opportunities);
+    expect(opp.stage).toBe("bid_invited");
+    expect(opp.nextAction).toContain("REVIEW");
   });
 });
 

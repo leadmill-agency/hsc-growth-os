@@ -252,6 +252,32 @@ export async function executeRun(db: Db, runId: string): Promise<string> {
   return "completed";
 }
 
+/** Standalone approval with no run behind it — e.g. an on-demand email draft
+ *  written from the Researched tab. resolveApproval handles the null runId. */
+export async function createApproval(
+  db: Db,
+  input: {
+    approvalType: string;
+    title: string;
+    summary?: string;
+    proposedAction?: string;
+    payload?: Record<string, unknown>;
+  }
+): Promise<string> {
+  const [row] = await db
+    .insert(approvals)
+    .values({
+      approvalType: input.approvalType,
+      title: input.title,
+      summary: input.summary,
+      proposedAction: input.proposedAction,
+      payload: input.payload ?? {},
+      status: "pending",
+    })
+    .returning();
+  return row.id;
+}
+
 /** Resolve a pending approval and resume its run. */
 export async function resolveApproval(
   db: Db,
