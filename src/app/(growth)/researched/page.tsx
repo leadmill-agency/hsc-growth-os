@@ -86,10 +86,14 @@ export default async function ResearchedPage({
         orderBy: desc(evidence.retrievedAt),
       })
     : [];
-  const briefByAccount = new Map<string, { about?: string; recommendation?: string | null }>();
+  const briefByAccount = new Map<string, { lead?: string; approach?: string }>();
   for (const row of briefRows) {
-    if (!briefByAccount.has(row.entityId))
-      briefByAccount.set(row.entityId, row.value as { about?: string; recommendation?: string | null });
+    if (briefByAccount.has(row.entityId)) continue;
+    const v = row.value as Record<string, unknown>;
+    briefByAccount.set(row.entityId, {
+      lead: (v.bottom_line ?? v.about) as string | undefined,
+      approach: (v.how_to_approach ?? v.recommendation) as string | undefined,
+    });
   }
 
   // Pending email drafts, matched to their opportunity when possible.
@@ -231,14 +235,14 @@ export default async function ResearchedPage({
                       {o.nextAction && <p className="mt-1 text-xs text-steel">{o.nextAction}</p>}
                       {(() => {
                         const b = o.accountId ? briefByAccount.get(o.accountId) : null;
-                        if (b?.about)
+                        if (b?.lead)
                           return (
                             <p className="mt-2 text-sm leading-relaxed text-ink-700">
-                              {b.about}
-                              {b.recommendation && (
+                              {b.lead}
+                              {b.approach && (
                                 <span className="mt-1 block text-xs font-medium text-ink">
                                   How to approach:{" "}
-                                  <span className="font-normal text-steel">{b.recommendation}</span>
+                                  <span className="font-normal text-steel">{b.approach}</span>
                                 </span>
                               )}
                             </p>
