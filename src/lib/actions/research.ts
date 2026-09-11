@@ -20,6 +20,8 @@ export const researchBriefSchema = z.object({
     size: z.string().nullable(),
     markets: z.array(z.string()),
     houston_presence: z.string().nullable(),
+    // The company's own site — Hunter needs a domain to find anyone's email.
+    official_website: z.string().nullable(),
   }),
   hsc_fit: z.object({
     relevant_products: z.array(z.string()),
@@ -84,7 +86,8 @@ export async function researchAccountBrief(
       "signs and awnings, Houston TX). Use ONLY the research text provided. Mark each person and " +
       "project with status: verified (explicit in research with source), inferred (strongly " +
       "implied), assumed, or unknown. Anything the research does not establish goes in unknowns. " +
-      "Never invent names, projects, or figures.",
+      "official_website: the company's OWN site when the research/sources show it (not " +
+      "LinkedIn, Yelp, or news) — null if unclear. Never invent names, projects, or figures.",
     prompt:
       `RESEARCH FINDINGS:\n${research.text}\n\nSOURCES:\n` +
       research.sources.map((s) => s.url).join("\n") +
@@ -99,6 +102,15 @@ export async function researchAccountBrief(
     .set({
       notes: brief.company.summary,
       headquarters: brief.company.headquarters ?? undefined,
+      ...(brief.company.official_website
+        ? {
+            website: brief.company.official_website,
+            domain: brief.company.official_website
+              .replace(/^https?:\/\//, "")
+              .replace(/^www\./, "")
+              .split("/")[0],
+          }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(accounts.id, params.accountId));

@@ -40,6 +40,7 @@ export const harveyBrief = {
     size: "400-600 employees",
     markets: ["higher education", "healthcare", "office", "civic"],
     houston_presence: "Headquartered in Houston with multiple active local projects.",
+    official_website: "https://www.harveycleary.com",
   },
   hsc_fit: {
     relevant_products: ["exterior signage", "wayfinding", "monument signs"],
