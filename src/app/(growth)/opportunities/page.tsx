@@ -2,7 +2,6 @@ import { getDb } from "@/lib/db/client";
 import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
-  submitSignalAction,
   pursueOpportunityAction,
   pullTdlrAction,
   setOpportunityStageAction,
@@ -190,33 +189,6 @@ export default async function OpportunitiesPage({
         ))}
       </div>
 
-      <form
-        action={submitSignalAction}
-        className="space-y-2 rounded-lg border border-fog bg-white p-4"
-      >
-        <div className="text-sm font-semibold">Add signal (PB05 Opportunity Radar)</div>
-        <p className="text-xs text-steel">
-          Paste a bid notice, permit line, news blurb, PlanHub invite, or forwarded email. The
-          radar classifies it, dedupes, scores it, and suggests the next ploybook.
-        </p>
-        <textarea
-          name="signalText"
-          required
-          rows={3}
-          placeholder="e.g. Harvey Cleary soliciting subs for UH Engineering Building, scope includes exterior signage…"
-          className="w-full rounded border border-fog px-2 py-1 text-sm"
-        />
-        <div className="flex items-center gap-3">
-          <input
-            name="sourceUrl"
-            placeholder="Source URL (optional)"
-            className="flex-1 rounded border border-fog px-2 py-1 text-sm"
-          />
-          <button className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
-            Run radar
-          </button>
-        </div>
-      </form>
 
       <div className="space-y-3">
         {rows.map((o) => {
@@ -354,8 +326,8 @@ export default async function OpportunitiesPage({
       </div>
       {rows.length === 0 && (
         <p className="text-sm text-steel">
-          No opportunities yet. They arrive via the daily TDLR pull, RB2B visitors, or pasted
-          signals above.
+          Nothing waiting for triage. New finds arrive with the morning pull (~7am) and
+          forwarded PlanHub invites.
         </p>
       )}
     </div>

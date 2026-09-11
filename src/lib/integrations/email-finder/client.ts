@@ -23,10 +23,50 @@ export function setEmailFinderForTests(fn: FinderOverride | null) {
   testOverride = fn;
 }
 
+/** Apollo People Match — richer contact DB; primary when APOLLO_API_KEY is set. */
+async function findViaApollo(params: FindEmailParams): Promise<FoundEmail | null> {
+  const key = process.env.APOLLO_API_KEY;
+  if (!key) return null;
+  const [firstName, ...rest] = params.fullName.split(/\s+/);
+  const lastName = rest.join(" ");
+  if (!firstName || !lastName) return null;
+  try {
+    const res = await fetch("https://api.apollo.io/api/v1/people/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      body: JSON.stringify({
+        first_name: firstName,
+        last_name: lastName,
+        ...(params.domain ? { domain: params.domain } : {}),
+        ...(params.company ? { organization_name: params.company } : {}),
+        reveal_personal_emails: false,
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[email-finder] apollo HTTP ${res.status} for ${params.fullName}`);
+      return null;
+    }
+    const json = (await res.json()) as {
+      person?: { email?: string | null; email_status?: string | null };
+    };
+    const email = json.person?.email;
+    if (!email || email.includes("email_not_unlocked")) return null;
+    const confidence = json.person?.email_status === "verified" ? 95 : 60;
+    return { email, confidence, source: "apollo" };
+  } catch (err) {
+    console.warn(`[email-finder] apollo lookup failed:`, (err as Error).message);
+    return null;
+  }
+}
+
 export async function findWorkEmail(params: FindEmailParams): Promise<FoundEmail | null> {
   if (testOverride) return testOverride(params);
+  if (!params.fullName || (!params.domain && !params.company)) return null;
+  // Apollo first (bigger contact database, per Rameel 2026-09-11); Hunter as fallback.
+  const viaApollo = await findViaApollo(params);
+  if (viaApollo) return viaApollo;
   const key = process.env.HUNTER_API_KEY;
-  if (!key || !params.fullName || (!params.domain && !params.company)) return null;
+  if (!key) return null;
   try {
     const qs = new URLSearchParams({ full_name: params.fullName, api_key: key });
     if (params.domain) qs.set("domain", params.domain);
