@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { DISMISS_REASONS } from "@/lib/dismiss-reasons";
 import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
@@ -306,12 +307,28 @@ export default async function OpportunitiesPage({
                           We won this
                         </button>
                       </form>
-                      <form action={setOpportunityStageAction}>
+                      <form action={setOpportunityStageAction} className="flex items-center gap-1">
                         <input type="hidden" name="opportunityId" value={o.id} />
                         <input type="hidden" name="stage" value="dismissed" />
+                        <select
+                          name="dismissReason"
+                          required
+                          defaultValue=""
+                          className="rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
+                          title="Required — every dismissal teaches the radar what to score lower"
+                        >
+                          <option value="" disabled>
+                            Why dismiss?
+                          </option>
+                          {DISMISS_REASONS.map(([code, label]) => (
+                            <option key={code} value={code}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
-                          title="Not relevant — remove from the working list"
+                          title="Not relevant — remove from the working list (reason required)"
                         >
                           Dismiss
                         </button>

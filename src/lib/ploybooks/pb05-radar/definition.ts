@@ -27,6 +27,39 @@ const signalParseSchema = z.object({
   unknowns: z.array(z.string()),
 });
 
+/** The owner's recent dismissals, as calibration hints for scoring (per Rameel
+ *  2026-09-12: forced reason codes teach the radar good vs bad). Empty string
+ *  when there's no feedback yet. */
+async function dismissalFeedback(db: import("@/lib/db/client").Db): Promise<string> {
+  const { activities } = await import("@/lib/db/schema");
+  const { and, eq, gte, desc } = await import("drizzle-orm");
+  const since = new Date(Date.now() - 30 * 24 * 3600 * 1000);
+  const rows = await db.query.activities.findMany({
+    where: and(eq(activities.action, "opportunity.dismissed"), gte(activities.occurredAt, since)),
+    orderBy: desc(activities.occurredAt),
+    limit: 50,
+  });
+  if (rows.length === 0) return "";
+  const counts = new Map<string, number>();
+  const examples: string[] = [];
+  for (const row of rows) {
+    const meta = (row.metadata ?? {}) as { reasonCode?: string };
+    const code = (meta.reasonCode ?? "other").replaceAll("_", " ");
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+    if (examples.length < 5 && row.detail) examples.push(row.detail);
+  }
+  const countLine = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([c, n]) => `${c}: ${n}`)
+    .join(", ");
+  return (
+    `\n\nOWNER FEEDBACK — the owner dismissed ${rows.length} opportunities in the last 30 days ` +
+    `(${countLine}). Recent examples:\n${examples.map((e) => `- ${e}`).join("\n")}\n` +
+    `Score signals that resemble these dismissal patterns LOWER; the reasons are ground truth ` +
+    `about what this business considers a bad opportunity.`
+  );
+}
+
 export const pb05OpportunityRadar: PloybookDefinition = {
   key: "pb05_opportunity_radar",
   name: "PB05 — Opportunity Radar",
@@ -42,6 +75,7 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         const p = ctx.triggerPayload as { signalText?: string; sourceUrl?: string };
         if (!p.signalText) throw new Error("signalText is required");
         const llm = getLLMClient();
+        const feedback = await dismissalFeedback(ctx.db);
         const parsed = await llm.generateStructured({
           system:
             "You classify raw commercial-construction signals for Houston Sign Crafters " +
@@ -81,7 +115,7 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "multi-tenant commercial developments (retail centers, mixed-use) — never schools, " +
             "civic buildings, or single-tenant projects; pb03 franchise expansion; pb04 " +
             "multi-location operators; none if irrelevant.",
-          prompt: `SIGNAL:\n${p.signalText}\n${p.sourceUrl ? `URL: ${p.sourceUrl}` : ""}`,
+          prompt: `SIGNAL:\n${p.signalText}\n${p.sourceUrl ? `URL: ${p.sourceUrl}` : ""}${feedback}`,
           schema: signalParseSchema,
           effort: "low",
         });

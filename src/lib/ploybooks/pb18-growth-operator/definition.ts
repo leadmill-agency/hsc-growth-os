@@ -34,6 +34,7 @@ export interface WeeklyMetrics {
   highIntentVisits: number;
   tdlrPulls: number;
   accountsCreated: number;
+  dismissalsByReason: Record<string, number>;
 }
 
 export async function gatherWeeklyMetrics(db: Db): Promise<WeeklyMetrics> {
@@ -93,6 +94,17 @@ export async function gatherWeeklyMetrics(db: Db): Promise<WeeklyMetrics> {
     .from(accounts)
     .where(gte(accounts.createdAt, since));
 
+  const { activities } = await import("@/lib/db/schema");
+  const dismissRows = await db.query.activities.findMany({
+    where: and(eq(activities.action, "opportunity.dismissed"), gte(activities.occurredAt, since)),
+    limit: 200,
+  });
+  const dismissalsByReason: Record<string, number> = {};
+  for (const row of dismissRows) {
+    const code = ((row.metadata ?? {}) as { reasonCode?: string }).reasonCode ?? "other";
+    dismissalsByReason[code] = (dismissalsByReason[code] ?? 0) + 1;
+  }
+
   return {
     since: since.toISOString(),
     opportunities: {
@@ -119,6 +131,7 @@ export async function gatherWeeklyMetrics(db: Db): Promise<WeeklyMetrics> {
     highIntentVisits: await countEvents("account.high_intent_visit"),
     tdlrPulls: await countEvents("radar.tdlr_pulled"),
     accountsCreated: accountsCreated.n,
+    dismissalsByReason,
   };
 }
 
@@ -164,6 +177,15 @@ export function describeMetrics(m: WeeklyMetrics): string {
     `Proposal pages viewed by prospects: ${m.proposalViews}. High-intent website visits: ${m.highIntentVisits}.`
   );
   lines.push(`New companies added to Accounts this week: ${m.accountsCreated}.`);
+  const dismissed = Object.entries(m.dismissalsByReason ?? {});
+  if (dismissed.length > 0) {
+    const total = dismissed.reduce((s, [, n]) => s + n, 0);
+    const parts = dismissed
+      .sort((a, b) => b[1] - a[1])
+      .map(([code, n]) => `${n} because ${code.replaceAll("_", " ")}`)
+      .join(", ");
+    lines.push(`Opportunities the owner passed on this week: ${total} (${parts}).`);
+  }
   return lines.join("\n");
 }
 

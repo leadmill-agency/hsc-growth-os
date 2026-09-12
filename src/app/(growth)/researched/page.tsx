@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db/client";
+import { DISMISS_REASONS } from "@/lib/dismiss-reasons";
 import {
   opportunities,
   accounts,
@@ -324,12 +325,28 @@ export default async function ResearchedPage({
                       )}
                       {/* Not interested after reading the research? That's a
                           valid outcome — the brief stays on the account. */}
-                      <form action={setOpportunityStageAction}>
+                      <form action={setOpportunityStageAction} className="flex flex-col items-end gap-1">
                         <input type="hidden" name="opportunityId" value={o.id} />
                         <input type="hidden" name="stage" value="dismissed" />
+                        <select
+                          name="dismissReason"
+                          required
+                          defaultValue=""
+                          className="w-36 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
+                          title="Required — every dismissal teaches the radar what to score lower"
+                        >
+                          <option value="" disabled>
+                            Why dismiss?
+                          </option>
+                          {DISMISS_REASONS.map(([code, label]) => (
+                            <option key={code} value={code}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-steel hover:border-signal"
-                          title="Not interested — removes the card; the research stays on the account if they ever come back"
+                          title="Not interested — removes the card (reason required); the research stays on the account"
                         >
                           Dismiss
                         </button>

@@ -466,6 +466,12 @@ export async function setOpportunityStageAction(formData: FormData) {
   const opportunityId = String(formData.get("opportunityId") ?? "");
   const stage = String(formData.get("stage") ?? "");
   if (!opportunityId || !["won", "lost", "dismissed"].includes(stage)) return;
+  // Dismissals REQUIRE a reason (per Rameel 2026-09-12): each one teaches the
+  // radar what a bad opportunity looks like. Enforced in the UI (required
+  // select) and here — no reason, no dismissal.
+  const dismissReason = String(formData.get("dismissReason") ?? "").trim();
+  const dismissNote = String(formData.get("dismissNote") ?? "").trim();
+  if (stage === "dismissed" && !dismissReason) return;
   const db = await getDb();
   const { opportunities } = await import("@/lib/db/schema");
   const { eq } = await import("drizzle-orm");
@@ -491,8 +497,15 @@ export async function setOpportunityStageAction(formData: FormData) {
       entityType: "opportunity",
       entityId: opportunityId,
       action: `opportunity.${stage}`,
-      detail: `${updated.name} marked ${stage} from the inbox`,
+      detail:
+        stage === "dismissed"
+          ? `${updated.name} dismissed: ${dismissReason.replaceAll("_", " ")}${dismissNote ? ` — ${dismissNote}` : ""}`
+          : `${updated.name} marked ${stage} from the inbox`,
       actor: "user",
+      metadata:
+        stage === "dismissed"
+          ? { reasonCode: dismissReason, note: dismissNote || undefined, source: updated.source ?? undefined, score: updated.overallScore ?? updated.fitScore ?? undefined }
+          : undefined,
     });
     await emitEvent(db, {
       eventType: `opportunity.${stage}`,
