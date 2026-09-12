@@ -49,7 +49,12 @@ export const pb10IncomingBid: PloybookDefinition = {
             "ground-up commercial buildings are 'likely' (they almost always carry signage/canopy " +
             "packages), and so are TENANT BUILD-OUTS for named retail/restaurant/hospitality " +
             "brands (a Nordstrom Rack or Chipotle build-out carries a sign package even when " +
-            "the invite doesn't say so). supplier_fab_items_expected: awning/canopy/backlit items HSC buys from " +
+            "the invite doesn't say so). CANOPY/AWNING RULE: HSC sells canopies and awnings " +
+            "STATEWIDE — if the scope plausibly includes awnings, canopies, covered walkways, " +
+            "shade structures, patio covers, drive-thru or fuel canopies (restaurants, schools, " +
+            "parks, pool amenities, gas stations), set relevance at least 'likely' AND list the " +
+            "expected items in supplier_fab_items_expected. " +
+            "supplier_fab_items_expected: awning/canopy/backlit items HSC buys from " +
             "suppliers. service_area from the project location: houston_metro = within ~150 " +
             "miles of downtown Houston (includes Galveston, Beaumont, College Station, " +
             "Victoria); texas_outside_houston = Texas beyond that (Dallas, Austin, San Antonio, " +
@@ -168,6 +173,12 @@ export const pb10IncomingBid: PloybookDefinition = {
                 : "PASS";
           let recommendation = byRelevance;
           let areaNote = "";
+          // Canopy/awning scope is valid STATEWIDE and never auto-passes
+          // (per Rameel 2026-09-12) — worst case it's a REVIEW for a human.
+          if (hasCanopyAwning && recommendation === "PASS") {
+            recommendation = "REVIEW";
+            areaNote = " Canopy/awning scope expected — HSC serves those statewide.";
+          }
           if (parsed.service_area === "outside_texas") {
             recommendation = "PASS";
             areaNote = " Outside Texas — beyond HSC's service area.";
