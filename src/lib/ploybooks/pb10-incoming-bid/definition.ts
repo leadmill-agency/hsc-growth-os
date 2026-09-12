@@ -109,6 +109,15 @@ export const pb10IncomingBid: PloybookDefinition = {
           })
           .returning();
         await saveEvidence(ctx.db, {
+          entityType: "opportunity",
+          entityId: opportunity.id,
+          fieldName: "origin_signal",
+          value: (p.inviteText ?? "").slice(0, 2000),
+          sourceUrl: p.sourceUrl,
+          sourceName: p.source ?? "bid_invite",
+          verificationStatus: "verified",
+        });
+        await saveEvidence(ctx.db, {
           entityType: "bid",
           entityId: bid.id,
           fieldName: "invitation",
@@ -168,11 +177,38 @@ export const pb10IncomingBid: PloybookDefinition = {
               areaNote = " Signage-only outside the Houston metro — HSC keeps sign work local.";
             }
           }
-          // New flow (per Rameel 2026-09-10): invites are TRIAGE cards in the
-          // Opportunities inbox, not approvals. The recommendation lives on the
-          // card; Pursue = we're bidding (moves to the bid desk), Dismiss = pass.
           const { opportunities } = await import("@/lib/db/schema");
           const { eq, sql } = await import("drizzle-orm");
+          // PASS by rule = closed by the system (per Rameel 2026-09-12: "if you
+          // believe we should pass on a bid, I trust you to close out the
+          // card"). Visible in History and the brief's passed-on count.
+          if (recommendation === "PASS") {
+            const reasonCode =
+              parsed.service_area === "outside_texas" || parsed.service_area === "texas_outside_houston"
+                ? "too_far"
+                : "no_sign_scope";
+            const reasonText = (areaNote.trim() || "No signage/awning scope identified in the invite.").trim();
+            await ctx.db
+              .update(opportunities)
+              .set({ stage: "dismissed", nextAction: null, updatedAt: new Date() })
+              .where(eq(opportunities.id, records.opportunityId as string));
+            await ctx.db
+              .update(bids)
+              .set({ status: "passed", lossReason: reasonText, updatedAt: new Date() })
+              .where(eq(bids.id, records.bidId as string));
+            await logActivity(ctx.db, {
+              entityType: "opportunity",
+              entityId: records.opportunityId as string,
+              action: "opportunity.dismissed",
+              detail: `${records.accountName} — ${records.projectName} auto-passed: ${reasonText}`,
+              actor: "system",
+              ploybookRunId: ctx.runId,
+              metadata: { reasonCode, note: reasonText, autoPassed: true },
+            });
+            return { kind: "completed", outputs: { recommendation, areaNote, autoPassed: true, childRunId: null } };
+          }
+          // BID/REVIEW invites are TRIAGE cards in the Opportunities inbox: the
+          // recommendation rides the card; Pursue = we're bidding, Dismiss = pass.
           await ctx.db
             .update(opportunities)
             .set({
