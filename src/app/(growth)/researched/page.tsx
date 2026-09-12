@@ -344,9 +344,14 @@ export default async function ResearchedPage({
                             </option>
                           ))}
                         </select>
+                        <input
+                          name="dismissNote"
+                          placeholder="Note (required if Other)"
+                          className="w-36 rounded border border-fog px-1.5 py-0.5 text-[11px]"
+                        />
                         <button
                           className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-steel hover:border-signal"
-                          title="Not interested — removes the card (reason required); the research stays on the account"
+                          title="Not interested — removes the card (reason required; picking Other needs the note)"
                         >
                           Dismiss
                         </button>

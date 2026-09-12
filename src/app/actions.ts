@@ -472,6 +472,7 @@ export async function setOpportunityStageAction(formData: FormData) {
   const dismissReason = String(formData.get("dismissReason") ?? "").trim();
   const dismissNote = String(formData.get("dismissNote") ?? "").trim();
   if (stage === "dismissed" && !dismissReason) return;
+  if (stage === "dismissed" && dismissReason === "other" && !dismissNote) return; // Other needs words
   const db = await getDb();
   const { opportunities } = await import("@/lib/db/schema");
   const { eq } = await import("drizzle-orm");

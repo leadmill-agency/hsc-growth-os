@@ -326,9 +326,14 @@ export default async function OpportunitiesPage({
                             </option>
                           ))}
                         </select>
+                        <input
+                          name="dismissNote"
+                          placeholder="Note (required if Other)"
+                          className="w-32 rounded border border-fog px-1.5 py-0.5 text-[11px]"
+                        />
                         <button
                           className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
-                          title="Not relevant — remove from the working list (reason required)"
+                          title="Not relevant — remove from the working list (reason required; picking Other needs the note)"
                         >
                           Dismiss
                         </button>
