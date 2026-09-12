@@ -47,7 +47,9 @@ export const pb10IncomingBid: PloybookDefinition = {
             "canopies). Extract only what the invitation states; unknowns stay unknown. " +
             "signage_awning_relevance: 'explicit' only if sign/awning/canopy scope is named; " +
             "ground-up commercial buildings are 'likely' (they almost always carry signage/canopy " +
-            "packages). supplier_fab_items_expected: awning/canopy/backlit items HSC buys from " +
+            "packages), and so are TENANT BUILD-OUTS for named retail/restaurant/hospitality " +
+            "brands (a Nordstrom Rack or Chipotle build-out carries a sign package even when " +
+            "the invite doesn't say so). supplier_fab_items_expected: awning/canopy/backlit items HSC buys from " +
             "suppliers. service_area from the project location: houston_metro = within ~150 " +
             "miles of downtown Houston (includes Galveston, Beaumont, College Station, " +
             "Victoria); texas_outside_houston = Texas beyond that (Dallas, Austin, San Antonio, " +
