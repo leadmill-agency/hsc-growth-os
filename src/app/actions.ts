@@ -385,8 +385,21 @@ export async function writeEmailAction(formData: FormData) {
   const opportunityId = String(formData.get("opportunityId") ?? "");
   if (!opportunityId) return;
   const db = await getDb();
-  const { ploybookRuns, ploybookSteps, accounts, opportunities } = await import("@/lib/db/schema");
+  const { ploybookRuns, ploybookSteps, accounts, opportunities, contacts, evidence } = await import(
+    "@/lib/db/schema"
+  );
   const { and, eq, desc, inArray, sql } = await import("drizzle-orm");
+  const opp = await db.query.opportunities.findFirst({ where: eq(opportunities.id, opportunityId) });
+  const account = opp?.accountId
+    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
+    : null;
+  if (!opp || !account) return;
+
+  // Draft inputs, best available first: a PB01 run's own outputs, else the
+  // account's research brief + stored contacts (works for cards researched by
+  // ANY playbook — PB04's HM Foundation card silently no-oped before this).
+  let brief: unknown;
+  let stakeholders: { people: unknown[] } | undefined;
   const run = await db.query.ploybookRuns.findFirst({
     where: and(
       eq(ploybookRuns.ploybookKey, "pb01_gc_pursuit"),
@@ -394,23 +407,81 @@ export async function writeEmailAction(formData: FormData) {
     ),
     orderBy: desc(ploybookRuns.createdAt),
   });
-  const opp = await db.query.opportunities.findFirst({ where: eq(opportunities.id, opportunityId) });
-  const account = opp?.accountId
-    ? await db.query.accounts.findFirst({ where: eq(accounts.id, opp.accountId) })
-    : null;
-  if (!run || !opp || !account) return;
-  const steps = await db.query.ploybookSteps.findMany({
-    where: and(
-      eq(ploybookSteps.runId, run.id),
-      inArray(ploybookSteps.stepKey, ["research", "stakeholder_map", "score_fit"])
-    ),
-  });
-  const byKey = new Map(steps.map((s) => [s.stepKey, s.outputs as Record<string, unknown>]));
-  const brief = byKey.get("research")?.brief;
-  const stakeholders = byKey.get("stakeholder_map")?.stakeholders as
-    | { people: { name?: string; title?: string }[] }
-    | undefined;
-  if (!brief || !stakeholders) return;
+  if (run) {
+    const steps = await db.query.ploybookSteps.findMany({
+      where: and(
+        eq(ploybookSteps.runId, run.id),
+        inArray(ploybookSteps.stepKey, ["research", "stakeholder_map"])
+      ),
+    });
+    const byKey = new Map(steps.map((s) => [s.stepKey, s.outputs as Record<string, unknown>]));
+    brief = byKey.get("research")?.brief;
+    stakeholders = byKey.get("stakeholder_map")?.stakeholders as { people: unknown[] } | undefined;
+  }
+  if (!brief || !stakeholders) {
+    const briefRow = await db.query.evidence.findFirst({
+      where: and(
+        eq(evidence.entityType, "account"),
+        eq(evidence.entityId, account.id),
+        eq(evidence.fieldName, "research_brief")
+      ),
+      orderBy: desc(evidence.retrievedAt),
+    });
+    const rb = (briefRow?.value ?? {}) as {
+      who_they_are?: string;
+      about?: string;
+      whats_happening?: string[];
+      signals?: string[];
+      how_to_approach?: string;
+      recommendation?: string;
+      footprint?: string[];
+    };
+    const contactRows = await db.query.contacts.findMany({
+      where: eq(contacts.accountId, account.id),
+      orderBy: desc(contacts.influenceScore),
+      limit: 5,
+    });
+    const summary = rb.who_they_are ?? rb.about;
+    if (!summary && contactRows.length === 0) {
+      const { logActivity } = await import("@/lib/events");
+      await logActivity(db, {
+        entityType: "opportunity",
+        entityId: opportunityId,
+        action: "outreach.draft_failed",
+        detail: `${opp.name} — no research brief or contacts to draft from; run Research on the account first`,
+        actor: "system",
+      });
+      revalidatePath("/researched");
+      return;
+    }
+    brief = {
+      company: {
+        summary: summary ?? `${account.name} (limited research on file)`,
+        headquarters: account.headquarters ?? null,
+        size: null,
+        markets: [],
+        houston_presence: (rb.footprint ?? []).join("; ") || null,
+        official_website: account.website ?? null,
+      },
+      hsc_fit: { relevant_products: [], potential_spend: null, repeatability: null },
+      people: [],
+      projects: [{ name: opp.name, location: null, stage: opp.stage, relevance: "this pursuit", status: "verified" }],
+      signals: rb.whats_happening ?? rb.signals ?? [],
+      recommended_motion: rb.how_to_approach ?? rb.recommendation ?? "Ask who handles the sign package.",
+      unknowns: [],
+    };
+    stakeholders = {
+      people: contactRows
+        .filter((c) => c.firstName || c.lastName)
+        .map((c) => ({
+          name: [c.firstName, c.lastName].filter(Boolean).join(" "),
+          title: c.title,
+          role_type: c.roleType ?? "unknown",
+          why_relevant: c.title ?? "",
+          status: "inferred",
+        })),
+    };
+  }
 
   const { draftOutreach } = await import("@/lib/actions/outreach");
   const draft = (await draftOutreach({
