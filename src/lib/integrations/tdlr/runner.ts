@@ -8,12 +8,30 @@ import { fetchRecentHoustonProjects, formatTdlrSignal, type TdlrPullOptions } fr
 // button, and the CLI script. Emits radar.tdlr_pulled so the scheduler can
 // check "already ran today" from the database (works across restarts/replicas).
 
+/** Signal-level dedupe: filing/permit numbers are stable across days, so a
+ *  signal already stored as origin_signal evidence never re-enters the radar —
+ *  no duplicate cards from parse variance, no re-paying to score known filings
+ *  (the TDLR window re-serves the same filings for days). */
+async function signalAlreadySeen(db: Db, marker: string): Promise<boolean> {
+  const { sql } = await import("drizzle-orm");
+  const rows = await db.execute(
+    sql`select 1 from evidence where field_name = 'origin_signal' and value::text like ${"%" + marker + "%"} limit 1`
+  );
+  return (rows as unknown as { length?: number; rows?: unknown[] }).rows
+    ? ((rows as unknown as { rows: unknown[] }).rows.length ?? 0) > 0
+    : ((rows as unknown as unknown[]).length ?? 0) > 0;
+}
+
 export async function runTdlrPull(db: Db, opts: TdlrPullOptions = {}) {
   const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
   await import("@/lib/ploybooks");
   const projects = await fetchRecentHoustonProjects(opts);
   const results: { projectNumber: string; name: string; status: string }[] = [];
   for (const project of projects) {
+    if (await signalAlreadySeen(db, project.ProjectNumber)) {
+      results.push({ projectNumber: project.ProjectNumber, name: project.ProjectName, status: "already_seen" });
+      continue;
+    }
     const { signalText, sourceUrl } = formatTdlrSignal(project);
     const runId = await launchRun(db, {
       ploybookKey: "pb05_opportunity_radar",
@@ -36,6 +54,10 @@ export async function runTdlrPull(db: Db, opts: TdlrPullOptions = {}) {
       .filter(isSignageRelevant)
       .slice(0, 25);
     for (const record of records) {
+      if (await signalAlreadySeen(db, `permit ${record.permitNumber}`)) {
+        results.push({ projectNumber: record.permitNumber, name: record.businessName, status: "already_seen" });
+        continue;
+      }
       const { signalText, sourceUrl } = formatCohSignal(record);
       const runId = await launchRun(db, {
         ploybookKey: "pb05_opportunity_radar",
