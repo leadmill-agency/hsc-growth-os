@@ -115,10 +115,13 @@ export async function resolveApprovalAction(formData: FormData) {
           }
         }
         const { createApproval } = await import("@/lib/ploybooks/runner");
-        for (const m of payload.messages ?? []) {
+        for (const [i, m] of (payload.messages ?? []).entries()) {
+          // The swarm card's fields are editable pre-approval — edits win.
+          const editedSubject = String(formData.get(`swarm_subject_${i}`) ?? "").trim();
+          const editedBody = String(formData.get(`swarm_body_${i}`) ?? "").trim();
           let draft: Record<string, unknown> = {
-            subject: m.subject,
-            body: m.body,
+            subject: editedSubject || m.subject,
+            body: editedBody || m.body,
             target_contact: m.contact_name,
             day_offset: m.day_offset,
           };

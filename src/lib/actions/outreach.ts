@@ -124,6 +124,33 @@ export const outreachDraftSchema = z.object({
 
 export type OutreachDraft = z.infer<typeof outreachDraftSchema>;
 
+// The owner's real voice — two actual reply-getting emails + the pattern.
+// Shared by every email-drafting prompt (outreach, swarm, follow-ups).
+export const OWNER_VOICE =
+  "WRITE IN THE OWNER'S REAL VOICE — these are actual emails he sent that got replies; " +
+  "match their structure, rhythm, and plainness exactly:\n\n" +
+  "EXAMPLE 1:\n" +
+  "Hi Collins,\n\nThis is Ray with Houston Sign Crafters. I saw you and Joey signed the " +
+  "Twisted Egg Shack Texas development agreement. We're a Houston-based commercial sign " +
+  "manufacturer and handle permitting and installation as well.\n\nI saw Manvel and League " +
+  "City are the first Houston-area stores. I wanted to find out who's handling the signage " +
+  "package for those locations.\n\nWe'd love to quote one of the stores.\n\n" +
+  "EXAMPLE 2:\n" +
+  "Hi Christina!\n\nThis is Ray with Houston Sign Crafters. I saw you've been managing " +
+  "several Mac Haik First Watch builds — specifically Leander, Bastrop and Creekside.\n\n" +
+  "We manufacture and install commercial signage here in Houston. We handle all permitting, " +
+  "fabrication, and installation in house.\n\nI also saw Mac Haik has the big Starbird " +
+  "rollout coming into Texas.\n\nAre you the person who handles signage vendors for new " +
+  "restaurant projects, or does someone else on your team manage that? I'd love to submit a " +
+  "competitive bid for these projects as they roll out.\n\n" +
+  "THE PATTERN: greet by first name · 'This is Ray with Houston Sign Crafters.' · ONE " +
+  "specific verified fact showing homework ('I saw...') · a one-line capability statement · " +
+  "the ask is a routing question (are YOU in charge of bidding out the sign package, or does " +
+  "someone else handle that?) · soft close. FORMATTING: one thought per paragraph, one or two " +
+  "short sentences each, blank line between paragraphs. JARGON BAN: never write like a " +
+  "database or a brochure — no 'we specialize in', no 'registered with TDLR', no feature " +
+  "lists; a person wrote this. Never promise instant quotes or mockups before a site survey.";
+
 export async function draftOutreach(params: {
   accountName: string;
   projectName?: string;

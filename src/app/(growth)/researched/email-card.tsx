@@ -37,6 +37,7 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
     messages?: { contact_name: string; subject: string; body: string; day_offset: number }[];
   };
   const messages = payload.messages ?? [];
+  const formId = `swarm-approve-${approval.id}`;
   return (
     <div className="rounded-lg border border-amber-200 bg-white p-4">
       <div className="text-xs font-semibold uppercase tracking-wide text-steel">Company swarm</div>
@@ -49,18 +50,30 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
           <div key={i} className="rounded-lg border border-fog bg-cloud/40 p-3">
             <div className="text-xs font-semibold text-ink-700">
               Day {m.day_offset} — to {m.contact_name}
+              <span className="ml-2 font-normal text-steel">edit freely — your edits carry through</span>
             </div>
-            <div className="mt-1 text-sm font-medium">{m.subject}</div>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{m.body}</p>
+            <input
+              name={`swarm_subject_${i}`}
+              form={formId}
+              defaultValue={m.subject}
+              className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1 text-sm font-medium"
+            />
+            <textarea
+              name={`swarm_body_${i}`}
+              form={formId}
+              defaultValue={m.body}
+              rows={Math.min(10, Math.max(4, m.body.split("\n").length + 2))}
+              className="mt-1.5 w-full rounded border border-fog bg-white px-2 py-1.5 text-sm leading-relaxed"
+            />
           </div>
         ))}
       </div>
       <p className="mt-2 text-xs text-steel">
-        Approving accepts the sequence plan. Each email still only sends when you send it —
-        nothing goes out from this click.
+        Approving accepts the sequence with your edits — each person then gets their own send
+        card. Nothing goes out from this click.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <form action={resolveApprovalAction}>
+        <form action={resolveApprovalAction} id={formId}>
           <input type="hidden" name="approvalId" value={approval.id} />
           <input type="hidden" name="decision" value="approved" />
           <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">

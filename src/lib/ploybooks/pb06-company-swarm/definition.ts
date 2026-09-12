@@ -12,6 +12,7 @@ import {
 import { contacts } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { emitEvent, logActivity } from "@/lib/events";
+import { OWNER_VOICE } from "@/lib/actions/outreach";
 
 // PB06 — Company Swarm: coordinated multi-contact pursuit of one account.
 // Trigger payload: { accountName, website?, context? }
@@ -124,9 +125,10 @@ export const pb06CompanySwarm: PloybookDefinition = {
         const llm = getLLMClient();
         const drafted = await llm.generateStructured({
           system:
-            "Draft one cold email per planned contact for Houston Sign Crafters (UL-certified, " +
-            "built in Houston, 5-year warranty, in-house permitting/install). Each message: " +
-            "≤120 words, plain English, one CTA, personalized to that person's role and hook — " +
+            OWNER_VOICE +
+            "\n\nDraft one cold email per planned contact for Houston Sign Crafters. Each message: " +
+            "≤120 words, in the OWNER'S VOICE above, one routing-question CTA, personalized to " +
+            "that person's role and hook — " +
             "the messages must be CLEARLY DIFFERENT from each other in angle and wording. " +
             "Never promise instant quotes or mockups before a survey. No invented facts.",
           prompt:
