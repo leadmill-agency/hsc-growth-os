@@ -14,8 +14,8 @@ import { emitEvent, logActivity } from "@/lib/events";
 export const MIN_ARTICLE_WORDS = 700;
 
 const articleDraftSchema = z.object({
-  title_tag: z.string().max(65),
-  meta_description: z.string().max(160),
+  title_tag: z.string(),
+  meta_description: z.string(),
   h1: z.string(),
   url_slug: z.string(),
   search_intent: z.string(),
@@ -35,6 +35,15 @@ export function countArticleWords(draft: ArticleDraft): number {
     ...draft.sections.map((s) => `${s.heading} ${s.body}`),
   ].join(" ");
   return text.trim().split(/\s+/).length;
+}
+
+
+// Soft SEO limits (2026-09-14): an overlong title/meta gets trimmed at a word
+// boundary — a hard schema .max() killed both playbooks' first production runs.
+function clampSeo<T extends { title_tag: string; meta_description: string }>(draft: T): T {
+  const trim = (s: string, max: number) =>
+    s.length > max ? s.slice(0, max - 3).replace(/\s+\S*$/, "") + "…" : s;
+  return { ...draft, title_tag: trim(draft.title_tag, 65), meta_description: trim(draft.meta_description, 160) };
 }
 
 export const pb17ContentBuilder: PloybookDefinition = {
@@ -85,7 +94,7 @@ export const pb17ContentBuilder: PloybookDefinition = {
         const research = ctx.priorOutputs["research_topic"];
         if (!target || !research) return { kind: "skipped", reason: "No uncovered topic" };
         const llm = getLLMClient();
-        const draft = await llm.generateStructured({
+        const draftRaw = await llm.generateStructured({
           system:
             "Write an article for Houston Sign Crafters' site answering a real buyer question. " +
             "HARD RULES: answer the question directly in the first paragraph, then earn depth; " +
@@ -104,6 +113,7 @@ export const pb17ContentBuilder: PloybookDefinition = {
           effort: "high",
           maxTokens: 16000,
         });
+        const draft = clampSeo(draftRaw);
         const words = countArticleWords(draft);
         if (words < MIN_ARTICLE_WORDS) {
           throw new Error(`Draft is ${words} words — minimum for articles is ${MIN_ARTICLE_WORDS}`);
