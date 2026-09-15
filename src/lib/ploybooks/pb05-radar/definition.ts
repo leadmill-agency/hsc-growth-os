@@ -42,8 +42,15 @@ async function dismissalFeedback(db: import("@/lib/db/client").Db): Promise<stri
   if (rows.length === 0) return "";
   const counts = new Map<string, number>();
   const examples: string[] = [];
+  let unclearCount = 0;
   for (const row of rows) {
     const meta = (row.metadata ?? {}) as { reasonCode?: string };
+    // "unclear" means the CARD failed to explain itself — presentation
+    // feedback, not a bad-opportunity signal. Kept out of the score-lower set.
+    if (meta.reasonCode === "unclear") {
+      unclearCount++;
+      continue;
+    }
     const code = (meta.reasonCode ?? "other").replaceAll("_", " ");
     counts.set(code, (counts.get(code) ?? 0) + 1);
     if (examples.length < 5 && row.detail) examples.push(row.detail);
@@ -56,7 +63,13 @@ async function dismissalFeedback(db: import("@/lib/db/client").Db): Promise<stri
     `\n\nOWNER FEEDBACK — the owner dismissed ${rows.length} opportunities in the last 30 days ` +
     `(${countLine}). Recent examples:\n${examples.map((e) => `- ${e}`).join("\n")}\n` +
     `Score signals that resemble these dismissal patterns LOWER; the reasons are ground truth ` +
-    `about what this business considers a bad opportunity.`
+    `about what this business considers a bad opportunity.` +
+    (unclearCount > 0
+      ? ` Separately, ${unclearCount} card(s) were dismissed as "I don't understand this ` +
+        `project" — that is feedback on YOUR writing, not the opportunity: make ` +
+        `why_this_matters state concretely WHAT is being built/opened, WHERE, and what sign ` +
+        `work it implies, in words a sign-shop owner instantly gets.`
+      : "")
   );
 }
 

@@ -10,6 +10,7 @@ export const DISMISS_REASONS: [string, string][] = [
   ["residential_or_civic", "Residential / civic — not our buyer"],
   ["bad_timing", "Real, but timing is off"],
   ["duplicate", "Duplicate of another card"],
+  ["unclear", "I don't understand this project"],
   ["other", "Other"],
 ];
 export const DISMISS_REASON_LABELS = new Map(DISMISS_REASONS);
