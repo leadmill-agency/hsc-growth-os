@@ -116,6 +116,8 @@ export async function resolveApprovalAction(formData: FormData) {
         }
         const { createApproval } = await import("@/lib/ploybooks/runner");
         for (const [i, m] of (payload.messages ?? []).entries()) {
+          // Unchecked "include" = dropped from the sequence entirely.
+          if (formData.get(`swarm_include_${i}`) !== "1") continue;
           // The swarm card's fields are editable pre-approval — edits win.
           const editedSubject = String(formData.get(`swarm_subject_${i}`) ?? "").trim();
           const editedBody = String(formData.get(`swarm_body_${i}`) ?? "").trim();

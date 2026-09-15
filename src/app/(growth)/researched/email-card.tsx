@@ -48,9 +48,15 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
       <div className="mt-2 space-y-2">
         {messages.map((m, i) => (
           <div key={i} className="rounded-lg border border-fog bg-cloud/40 p-3">
-            <div className="text-xs font-semibold text-ink-700">
-              Day {m.day_offset} — to {m.contact_name}
-              <span className="ml-2 font-normal text-steel">edit freely — your edits carry through</span>
+            <div className="flex items-center justify-between text-xs font-semibold text-ink-700">
+              <span>
+                Day {m.day_offset} — to {m.contact_name}
+                <span className="ml-2 font-normal text-steel">edit freely — your edits carry through</span>
+              </span>
+              <label className="flex cursor-pointer items-center gap-1.5 font-normal text-steel">
+                <input type="checkbox" name={`swarm_include_${i}`} value="1" defaultChecked form={formId} />
+                include
+              </label>
             </div>
             <input
               name={`swarm_subject_${i}`}
@@ -69,8 +75,9 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
         ))}
       </div>
       <p className="mt-2 text-xs text-steel">
-        Approving accepts the sequence with your edits — each person then gets their own send
-        card. Nothing goes out from this click.
+        Approving accepts the sequence with your edits — each INCLUDED person gets their own
+        send card; uncheck anyone to drop them from the sequence entirely. Nothing goes out
+        from this click.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <form action={resolveApprovalAction} id={formId}>
