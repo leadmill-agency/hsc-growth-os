@@ -75,6 +75,14 @@ export async function sendExternal(db: Db, approvalId: string, message: Outbound
   if (payload.sentAt) {
     throw new SendBlockedError("this approval has already been used for a send");
   }
+  if (!adapter) {
+    // Instrumentation and server actions are bundled separately in Next — the
+    // adapter registered at boot lives in ANOTHER copy of this module (found
+    // the hard way 2026-09-15: a real approved send silently skipped). Lazily
+    // self-register from env instead of trusting cross-bundle module state.
+    const { registerResendAdapterIfConfigured } = await import("./resend-adapter");
+    registerResendAdapterIfConfigured();
+  }
   if (!adapter) throw new SendBlockedError("no send adapter registered");
 
   const result = await adapter(message);
@@ -110,6 +118,15 @@ export async function sendExternal(db: Db, approvalId: string, message: Outbound
     })
     .returning();
 
+  if (message.opportunityId) {
+    // The card's job is done once the email is out — move it off Researched
+    // into pursuing (awaiting reply).
+    const { opportunities } = await import("@/lib/db/schema");
+    await db
+      .update(opportunities)
+      .set({ stage: "pursuing", nextAction: "Outreach sent — awaiting reply", updatedAt: new Date() })
+      .where(eq(opportunities.id, message.opportunityId));
+  }
   if (message.accountId) {
     await logActivity(db, {
       entityType: "account",

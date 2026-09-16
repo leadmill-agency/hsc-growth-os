@@ -19,6 +19,9 @@ export function registerResendAdapterIfConfigured(): boolean {
         // `send` subdomain, so the two coexist).
         from: `Ray at Houston Sign Crafters <${fromEmail}>`,
         to: [message.to],
+        // A copy of every outbound lands in the real mailbox (SEND_BCC_EMAIL)
+        // so "did it send?" is answerable from Gmail, not just the History log.
+        ...(process.env.SEND_BCC_EMAIL ? { bcc: [process.env.SEND_BCC_EMAIL] } : {}),
         subject: message.subject,
         text: message.body,
       }),

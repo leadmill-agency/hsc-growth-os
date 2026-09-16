@@ -216,8 +216,26 @@ export async function resolveApprovalAction(formData: FormData) {
         }
       }
     } catch (err) {
-      // Sending blocked (env off / domain unverified / no adapter) — approval still stands.
-      console.warn(`[send] approval ${approvalId} approved but send skipped:`, (err as Error).message);
+      // A blocked send must be VISIBLE (2026-09-15: one skipped silently) —
+      // put the card back in pending with the error written on it, retryable.
+      console.warn(`[send] approval ${approvalId} approved but send failed:`, (err as Error).message);
+      try {
+        const { approvals } = await import("@/lib/db/schema");
+        const { eq, sql } = await import("drizzle-orm");
+        await db
+          .update(approvals)
+          .set({
+            status: "pending",
+            resolvedAt: null,
+            resolvedBy: null,
+            payload: sql`jsonb_set(${approvals.payload}, '{send_error}', ${JSON.stringify(
+              `Send failed: ${(err as Error).message.slice(0, 160)} — fix and approve again.`
+            )}::jsonb)`,
+          })
+          .where(eq(approvals.id, approvalId));
+      } catch (revertErr) {
+        console.error(`[send] could not revert approval ${approvalId}:`, revertErr);
+      }
     }
   }
   revalidatePath("/approvals");

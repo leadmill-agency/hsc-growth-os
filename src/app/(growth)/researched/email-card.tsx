@@ -106,11 +106,17 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
 }
 
 export function EmailApprovalCard({ approval }: { approval: typeof approvals.$inferSelect }) {
-  const draft = ((approval.payload ?? {}) as { draft?: EmailDraft }).draft ?? {};
+  const payload = (approval.payload ?? {}) as { draft?: EmailDraft; send_error?: string };
+  const draft = payload.draft ?? {};
   const formId = `approve-${approval.id}`;
   const hasAlternate = !!draft.alternate_body;
   return (
     <div className="rounded-lg border border-amber-200 bg-white p-4">
+      {payload.send_error && (
+        <p className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+          {payload.send_error}
+        </p>
+      )}
       <div className="text-sm font-semibold">{approval.title}</div>
       {draft.target_contact && (
         <p className="mt-1 text-sm">

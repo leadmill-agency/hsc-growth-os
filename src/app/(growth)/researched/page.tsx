@@ -39,7 +39,7 @@ export default async function ResearchedPage({
   // Researched (and in-flight) opportunities that aren't inbound bids.
   const rows = await db.query.opportunities.findMany({
     where: and(
-      inArray(opportunities.stage, ["researching", "researched", "pursuing"]),
+      inArray(opportunities.stage, ["researching", "researched"]),
       notInArray(sql`coalesce(${opportunities.opportunityType}, '')`, ["incoming_bid", "bid"])
     ),
     orderBy: [
