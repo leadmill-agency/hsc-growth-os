@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 import { getDb } from "@/lib/db/client";
 import { accounts } from "@/lib/db/schema";
 import { desc, sql } from "drizzle-orm";
@@ -61,9 +62,9 @@ export default async function AccountsPage() {
           Website
           <input name="website" className="rounded border border-fog px-2 py-1 text-sm" />
         </label>
-        <button className="rounded bg-signal hover:bg-signal-600 px-3 py-1.5 text-sm font-medium text-white">
+        <SubmitButton className="rounded bg-signal hover:bg-signal-600 px-3 py-1.5 text-sm font-medium text-white">
           Add account
-        </button>
+        </SubmitButton>
       </form>
 
       <table className="w-full text-left text-sm">

@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 import { DISMISS_REASONS } from "@/lib/dismiss-reasons";
 import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -153,9 +154,9 @@ export default async function OpportunitiesPage({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Opportunities</h1>
         <form action={pullTdlrAction}>
-          <button className="rounded border border-fog bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-signal">
+          <SubmitButton className="rounded border border-fog bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-signal">
             Pull filings now
-          </button>
+          </SubmitButton>
         </form>
       </div>
 
@@ -273,7 +274,7 @@ export default async function OpportunitiesPage({
                   {["discovered", "bid_invited"].includes(o.stage) && (
                     <form action={pursueOpportunityAction}>
                       <input type="hidden" name="opportunityId" value={o.id} />
-                      <button
+                      <SubmitButton
                         className="rounded bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-600"
                         title={
                           ["incoming_bid", "bid"].includes(o.opportunityType ?? "")
@@ -284,7 +285,7 @@ export default async function OpportunitiesPage({
                         {["incoming_bid", "bid"].includes(o.opportunityType ?? "")
                           ? "Bid this"
                           : "Pursue"}
-                      </button>
+                      </SubmitButton>
                     </form>
                   )}
                   {action && (
@@ -300,12 +301,12 @@ export default async function OpportunitiesPage({
                       <form action={setOpportunityStageAction}>
                         <input type="hidden" name="opportunityId" value={o.id} />
                         <input type="hidden" name="stage" value="won" />
-                        <button
+                        <SubmitButton
                           className="rounded border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
                           title="We already won this work — mark it and celebrate"
                         >
                           We won this
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form action={setOpportunityStageAction} className="flex items-center gap-1">
                         <input type="hidden" name="opportunityId" value={o.id} />
@@ -331,12 +332,12 @@ export default async function OpportunitiesPage({
                           placeholder="Note (required if Other)"
                           className="w-32 rounded border border-fog px-1.5 py-0.5 text-[11px]"
                         />
-                        <button
+                        <SubmitButton
                           className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
                           title="Not relevant — remove from the working list (reason required; picking Other needs the note)"
                         >
                           Dismiss
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   )}

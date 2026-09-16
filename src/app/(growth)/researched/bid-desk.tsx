@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 import { bids, opportunities, accounts, evidence } from "@/lib/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
@@ -222,9 +223,9 @@ export async function BidDesk() {
               className="min-w-0 flex-1 text-xs text-steel file:mr-2 file:rounded file:border-0 file:bg-cloud file:px-2 file:py-1 file:text-xs file:font-medium file:text-ink-700"
             />
           </div>
-          <button className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
+          <SubmitButton className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
             Upload + analyze
-          </button>
+          </SubmitButton>
         </form>
 
         <form
@@ -244,9 +245,9 @@ export async function BidDesk() {
             placeholder="Paste the full invitation text here…"
             className="w-full rounded border border-fog px-2 py-1 text-sm"
           />
-          <button className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
+          <SubmitButton className="rounded bg-signal px-3 py-1.5 text-sm font-medium text-white hover:bg-signal-600">
             Create bid from invite
-          </button>
+          </SubmitButton>
         </form>
       </div>
 
@@ -280,9 +281,9 @@ export async function BidDesk() {
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     <form action={runBidQaAction}>
                       <input type="hidden" name="bidId" value={bid.id} />
-                      <button className="rounded bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-600">
+                      <SubmitButton className="rounded bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-600">
                         Run QA checklist
-                      </button>
+                      </SubmitButton>
                     </form>
                     {bid.status !== "submitted" && (
                       <form action={uploadBidPackageAction} className="flex items-center gap-1.5">
@@ -294,9 +295,9 @@ export async function BidDesk() {
                           required
                           className="w-52 text-xs text-steel file:mr-2 file:rounded file:border-0 file:bg-cloud file:px-2 file:py-1 file:text-xs file:font-medium file:text-ink-700"
                         />
-                        <button className="rounded border border-fog bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:border-signal">
+                        <SubmitButton className="rounded border border-fog bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:border-signal">
                           Upload + analyze
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                   </div>
@@ -314,9 +315,9 @@ export async function BidDesk() {
                 >
                   <input type="hidden" name="bidId" value={bid.id} />
                   <input type="hidden" name="outcome" value="submitted" />
-                  <button className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
+                  <SubmitButton className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
                     Mark submitted
-                  </button>
+                  </SubmitButton>
                   <span className="text-[11px] text-steel">
                     submitted the proposal in PlanHub or by email? Click this — it starts the
                     automatic follow-up cadence
@@ -333,9 +334,9 @@ export async function BidDesk() {
                       placeholder="Award $ (optional)"
                       className="w-32 rounded border border-fog px-2 py-1 text-xs"
                     />
-                    <button className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700">
+                    <SubmitButton className="rounded bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700">
                       We won
-                    </button>
+                    </SubmitButton>
                   </form>
                   <form action={recordBidOutcomeAction} className="flex items-center gap-1.5">
                     <input type="hidden" name="bidId" value={bid.id} />
@@ -345,9 +346,9 @@ export async function BidDesk() {
                       placeholder="Why lost? (optional)"
                       className="w-44 rounded border border-fog px-2 py-1 text-xs"
                     />
-                    <button className="rounded border border-red-300 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
+                    <SubmitButton className="rounded border border-red-300 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
                       We lost
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               )}

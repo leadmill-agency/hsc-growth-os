@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 import { getDb } from "@/lib/db/client";
 import { DISMISS_REASONS } from "@/lib/dismiss-reasons";
 import {
@@ -298,28 +299,28 @@ export default async function ResearchedPage({
                         <>
                         <form action={writeEmailAction}>
                           <input type="hidden" name="opportunityId" value={o.id} />
-                          <button
+                          <SubmitButton
                             className="rounded bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-600"
                             title="Find the contact's email (Hunter) and draft in your voice — the editable draft appears below this card"
                           >
                             Write email
-                          </button>
+                          </SubmitButton>
                         </form>
                         <form action={launchAccountPloybookAction}>
                           <input type="hidden" name="accountName" value={account.name} />
                           <input type="hidden" name="accountId" value={account.id} />
                           <input type="hidden" name="which" value="swarm" />
-                          <button className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
+                          <SubmitButton className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
                             Company swarm
-                          </button>
+                          </SubmitButton>
                         </form>
                         <form action={launchAccountPloybookAction}>
                           <input type="hidden" name="accountName" value={account.name} />
                           <input type="hidden" name="accountId" value={account.id} />
                           <input type="hidden" name="which" value="abm_page" />
-                          <button className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
+                          <SubmitButton className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-ink-700 hover:border-signal">
                             ABM page
-                          </button>
+                          </SubmitButton>
                         </form>
                         </>
                       )}
@@ -349,12 +350,12 @@ export default async function ResearchedPage({
                           placeholder="Note (required if Other)"
                           className="w-36 rounded border border-fog px-1.5 py-0.5 text-[11px]"
                         />
-                        <button
+                        <SubmitButton
                           className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-steel hover:border-signal"
                           title="Not interested — removes the card (reason required; picking Other needs the note)"
                         >
                           Dismiss
-                        </button>
+                        </SubmitButton>
                       </form>
                     </div>
                   </div>
@@ -408,14 +409,14 @@ export default async function ResearchedPage({
                     <form action={resolveApprovalAction}>
                       <input type="hidden" name="approvalId" value={a.id} />
                       <input type="hidden" name="decision" value="approved" />
-                      <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+                      <SubmitButton className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
                         Approve
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={resolveApprovalAction}>
                       <input type="hidden" name="approvalId" value={a.id} />
                       <input type="hidden" name="decision" value="rejected" />
-                      <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Reject</button>
+                      <SubmitButton className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Reject</SubmitButton>
                     </form>
                   </div>
                 </div>

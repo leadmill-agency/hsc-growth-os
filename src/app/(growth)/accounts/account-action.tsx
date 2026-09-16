@@ -1,4 +1,5 @@
 import { launchAccountPloybookAction } from "@/app/actions";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 
 export const typeLabels: Record<string, string> = {
   general_contractor: "General contractor",
@@ -34,12 +35,12 @@ export function AccountAction({
       <input type="hidden" name="accountName" value={accountName} />
       <input type="hidden" name="accountId" value={accountId} />
       <input type="hidden" name="which" value={which} />
-      <button
+      <SubmitButton
         title={title}
         className="rounded border border-fog bg-white px-2 py-1 text-xs font-medium text-ink-700 hover:border-signal hover:text-signal"
       >
         {label}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

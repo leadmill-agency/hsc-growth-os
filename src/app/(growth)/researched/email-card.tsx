@@ -1,4 +1,5 @@
 import { resolveApprovalAction, findEmailForApprovalAction } from "@/app/actions";
+import { SubmitButton } from "@/app/(growth)/submit-button";
 import type { approvals } from "@/lib/db/schema";
 
 // One pending email draft, fully editable, with the guarded send. Lives on the
@@ -83,9 +84,9 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
         <form action={resolveApprovalAction} id={formId}>
           <input type="hidden" name="approvalId" value={approval.id} />
           <input type="hidden" name="decision" value="approved" />
-          <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+          <SubmitButton className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
             Approve the sequence
-          </button>
+          </SubmitButton>
         </form>
         <form action={resolveApprovalAction} className="flex items-center gap-2">
           <input type="hidden" name="approvalId" value={approval.id} />
@@ -98,7 +99,7 @@ export function SwarmApprovalCard({ approval }: { approval: typeof approvals.$in
               </option>
             ))}
           </select>
-          <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Discard</button>
+          <SubmitButton className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Discard</SubmitButton>
         </form>
       </div>
     </div>
@@ -205,9 +206,9 @@ export function EmailApprovalCard({ approval }: { approval: typeof approvals.$in
             placeholder="Recipient email (verified) — sends on approve"
             className="w-72 rounded border border-fog px-2 py-1 text-xs"
           />
-          <button className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+          <SubmitButton className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
             Approve (+ send if email given)
-          </button>
+          </SubmitButton>
         </form>
         <form action={resolveApprovalAction} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="approvalId" value={approval.id} />
@@ -220,17 +221,17 @@ export function EmailApprovalCard({ approval }: { approval: typeof approvals.$in
               </option>
             ))}
           </select>
-          <button className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Discard draft</button>
+          <SubmitButton className="rounded bg-fog px-3 py-1.5 text-xs font-medium">Discard draft</SubmitButton>
         </form>
         {!draft.suggested_email && (
           <form action={findEmailForApprovalAction}>
             <input type="hidden" name="approvalId" value={approval.id} />
-            <button
+            <SubmitButton
               className="rounded border border-fog bg-white px-2.5 py-1.5 text-xs font-medium text-ink-700 hover:border-signal"
               title="Look up this contact's work email with Hunter"
             >
               Find email
-            </button>
+            </SubmitButton>
           </form>
         )}
       </div>
