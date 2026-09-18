@@ -111,6 +111,23 @@ export async function register() {
       console.error("[scheduler] TDLR pull failed:", err);
     }
 
+    // Weekly SEO + content scan (per Rameel 2026-09-18): Mondays after the
+    // morning intake, PB16 drafts one city × product page and PB17 one buyer-
+    // question article. "Due" is week-based, so a Monday outage just means the
+    // scan runs on the next tick instead of skipping the week.
+    try {
+      const hourUtc = new Date().getUTCHours();
+      if (hourUtc >= 13) {
+        const { weeklySeoScanDue, runWeeklySeoScan } = await import("@/lib/integrations/seo-scan/weekly");
+        if (await weeklySeoScanDue(db)) {
+          console.log("[scheduler] running weekly SEO + content scan");
+          for (const line of await runWeeklySeoScan(db)) console.log(`[scheduler] ${line}`);
+        }
+      }
+    } catch (err) {
+      console.error("[scheduler] weekly SEO scan failed:", err);
+    }
+
     // Daily web Expansion Scout (franchises/developments/operators — radar PRD §5)
     try {
       const hourUtc = new Date().getUTCHours();
