@@ -19,8 +19,12 @@ export async function register() {
 
   if (process.env.ENABLE_SCHEDULER !== "true") return;
 
-  // Boot sweep: a fresh process means every "running" run died with the old one
-  // (deploys restart the server mid-research otherwise silently stranding runs).
+  // Boot sweep: after a deploy, "running" runs that died with the old process
+  // need picking up. NOT instantly (2026-09-18): scripts also execute runs
+  // against the same database from outside this process, and a boot sweep that
+  // grabs every running run stole one mid-draft and produced duplicate
+  // approvals. Runs heartbeat updatedAt at each step start, so 10 minutes of
+  // staleness means genuinely dead, not just a slow step elsewhere.
   const bootSweep = async () => {
     try {
       const { getDb } = await import("@/lib/db/client");
@@ -28,7 +32,7 @@ export async function register() {
       const { resumeOrphanedRuns } = await import("@/lib/ploybooks/runner");
       await import("@/lib/ploybooks");
       const resumed = await resumeOrphanedRuns(db, {
-        runningOlderThanMs: 0,
+        runningOlderThanMs: 10 * 60 * 1000,
         queuedOlderThanMs: 2 * 60 * 1000,
       });
       if (resumed) console.log(`[scheduler] auto-resumed ${resumed} orphaned run(s) after boot`);
@@ -42,12 +46,14 @@ export async function register() {
     const db = await getDb();
 
     // Steady-state orphan pickup: queued runs nobody executed (e.g. PB10's child
-    // analysis), and running runs stale for 30+ min (crashed handler).
+    // analysis), and running runs 15+ min stale (crashed handler or killed by a
+    // deploy mid-step — updatedAt refreshes at each step start, so only a
+    // single step stuck longer than this trips it).
     try {
       const { resumeOrphanedRuns } = await import("@/lib/ploybooks/runner");
       await import("@/lib/ploybooks");
       const resumed = await resumeOrphanedRuns(db, {
-        runningOlderThanMs: 30 * 60 * 1000,
+        runningOlderThanMs: 15 * 60 * 1000,
         queuedOlderThanMs: 2 * 60 * 1000,
       });
       if (resumed) console.log(`[scheduler] auto-resumed ${resumed} orphaned run(s)`);

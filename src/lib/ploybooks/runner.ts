@@ -1,6 +1,6 @@
 import type { Db } from "@/lib/db/client";
 import { ploybookRuns, ploybookSteps, approvals } from "@/lib/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { emitEvent, logActivity } from "@/lib/events";
 import { ensurePloybookRow, getPloybook } from "./registry";
 import type { StepContext, StepResult } from "./types";
@@ -110,19 +110,34 @@ export async function executeRun(db: Db, runId: string): Promise<string> {
     if (!stepDef) throw new Error(`Step definition missing: ${run.ploybookKey}/${row.stepKey}`);
 
     // Resuming a step that was waiting: only proceed once its approval is resolved.
+    // A double-executed run (2026-09-18 boot-sweep race) can leave duplicate
+    // approvals on one step: the first human decision wins and any leftover
+    // pending duplicates are marked superseded so no zombie card lingers.
     let approvalResolution: StepContext["approvalResolution"];
     if (row.status === "waiting_for_approval") {
-      const approval = await db.query.approvals.findFirst({
+      const stepApprovals = await db.query.approvals.findMany({
         where: and(eq(approvals.stepId, row.id)),
+        orderBy: desc(approvals.resolvedAt),
       });
-      if (!approval || approval.status === "pending") {
+      const resolved = stepApprovals.find((a) =>
+        ["approved", "rejected", "edited"].includes(a.status)
+      );
+      if (!resolved) {
         await setRunStatus(db, runId, "waiting_for_approval", { currentStep: row.stepKey });
         return "waiting_for_approval";
       }
+      for (const dupe of stepApprovals) {
+        if (dupe.status === "pending") {
+          await db
+            .update(approvals)
+            .set({ status: "superseded", resolvedAt: new Date(), resolvedBy: "system" })
+            .where(eq(approvals.id, dupe.id));
+        }
+      }
       approvalResolution = {
-        status: approval.status as "approved" | "rejected" | "edited",
-        payload: (approval.resolutionPayload ?? null) as Record<string, unknown> | null,
-        resolvedBy: approval.resolvedBy,
+        status: resolved.status as "approved" | "rejected" | "edited",
+        payload: (resolved.resolutionPayload ?? null) as Record<string, unknown> | null,
+        resolvedBy: resolved.resolvedBy,
       };
     }
 
