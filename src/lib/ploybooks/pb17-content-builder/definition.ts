@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { PloybookDefinition } from "../types";
 import { getLLMClient } from "@/lib/ai/client";
 import { getResearchProvider } from "@/lib/integrations/research/provider";
-import { fetchSitemapUrls } from "@/lib/integrations/website/sitemap";
+import { fetchSitemapUrls, findTopicCoveringUrls } from "@/lib/integrations/website/sitemap";
 import { saveEvidence } from "@/lib/actions/entities";
 import { emitEvent, logActivity } from "@/lib/events";
 
@@ -61,10 +61,14 @@ export const pb17ContentBuilder: PloybookDefinition = {
         const p = ctx.triggerPayload as { topicInput?: string };
         if (!p.topicInput) throw new Error("topicInput is required (a question, objection, or search query)");
         const urls = await fetchSitemapUrls();
-        const slugGuess = p.topicInput.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
-        const covered = urls.find((u) => u.includes(slugGuess));
-        if (covered) {
-          return { kind: "skipped", reason: `Likely already covered: ${covered}` };
+        // Keyword-stem coverage, not slug substring — a slug check missed that
+        // an existing post already answered the permit question (2026-09-18).
+        const covered = findTopicCoveringUrls(urls, p.topicInput);
+        if (covered.length > 0) {
+          return {
+            kind: "skipped",
+            reason: `Likely already covered: ${covered[0]} — improve that page instead of duplicating it`,
+          };
         }
         return { kind: "completed", outputs: { topic: p.topicInput, sitemapSize: urls.length } };
       },

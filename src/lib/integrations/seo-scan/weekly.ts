@@ -1,6 +1,11 @@
 import type { Db } from "@/lib/db/client";
 import { sql } from "drizzle-orm";
-import { fetchSitemapUrls, findCoveringUrls } from "@/lib/integrations/website/sitemap";
+import {
+  fetchSitemapUrls,
+  findCoveringUrls,
+  findTopicCoveringUrls,
+  topicsOverlap,
+} from "@/lib/integrations/website/sitemap";
 
 // Weekly SEO + content scan (per Rameel 2026-09-18): every Monday morning the
 // system drafts ONE new city × product landing page (PB16) and ONE buyer-question
@@ -40,6 +45,9 @@ export const SEO_PRODUCTS = [
   "Vehicle Wraps",
 ];
 
+// Fallback topic backlog (per Rameel 2026-09-19 the PRIMARY topic source is
+// live GSC content gaps — queries the site already gets impressions for but
+// ranks poorly on; this list only feeds weeks where GSC has no usable gap).
 // Real buyer questions and objections, roughly in search-demand order. Each
 // becomes one PB17 article; figures stay out unless a human confirms them.
 export const CONTENT_TOPICS = [
@@ -71,10 +79,16 @@ export function seoMatrixCombos(): string[] {
   return combos;
 }
 
-/** Pure picker (testable): next uncovered, never-drafted targets. */
+/**
+ * Pure picker (testable): next uncovered, never-drafted targets.
+ * Topic candidates are GSC content-gap queries first (real demand the site
+ * already surfaces for), then the curated backlog. A candidate is skipped when
+ * an existing page covers its keywords or a prior draft was a near-duplicate.
+ */
 export function pickNextSeoTargets(
   sitemapUrls: string[],
-  priorInputs: { matrixInputs: string[]; topicInputs: string[] }
+  priorInputs: { matrixInputs: string[]; topicInputs: string[] },
+  gapQueries: string[] = []
 ): { matrixInput: string | null; topicInput: string | null } {
   const matrixInput =
     seoMatrixCombos().find((combo) => {
@@ -84,10 +98,9 @@ export function pickNextSeoTargets(
     }) ?? null;
 
   const topicInput =
-    CONTENT_TOPICS.find((topic) => {
-      if (priorInputs.topicInputs.includes(topic)) return false;
-      const slugGuess = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
-      return !sitemapUrls.some((u) => u.includes(slugGuess));
+    [...gapQueries, ...CONTENT_TOPICS].find((topic) => {
+      if (priorInputs.topicInputs.some((prior) => topicsOverlap(prior, topic))) return false;
+      return findTopicCoveringUrls(sitemapUrls, topic).length === 0;
     }) ?? null;
 
   return { matrixInput, topicInput };
@@ -141,10 +154,26 @@ export async function runWeeklySeoScan(db: Db, opts: { force?: boolean } = {}): 
   const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
   await import("@/lib/ploybooks");
 
-  const targets = pickNextSeoTargets(sitemapUrls, {
-    matrixInputs: await priorInputsFor(db, "pb16_local_seo", "matrixInput"),
-    topicInputs: await priorInputsFor(db, "pb17_content_builder", "topicInput"),
-  });
+  // Live demand first: GSC queries with impressions but a poor rank become the
+  // article topic. If GSC is unreachable, the curated backlog carries the week.
+  let gapQueries: string[] = [];
+  try {
+    const { fetchContentGaps } = await import("@/lib/integrations/gsc/client");
+    const gaps = await fetchContentGaps({ days: 28, minImpressions: 10, minPosition: 8, limit: 15 });
+    gapQueries = gaps.map((g) => g.query);
+    if (gapQueries.length) log.push(`GSC gaps: ${gapQueries.length} candidate topic(s), top "${gapQueries[0]}"`);
+  } catch (err) {
+    log.push(`GSC gaps unavailable (${err instanceof Error ? err.message : err}) — using topic backlog`);
+  }
+
+  const targets = pickNextSeoTargets(
+    sitemapUrls,
+    {
+      matrixInputs: await priorInputsFor(db, "pb16_local_seo", "matrixInput"),
+      topicInputs: await priorInputsFor(db, "pb17_content_builder", "topicInput"),
+    },
+    gapQueries
+  );
 
   if (!opts.force && (await ranSince(db, "pb16_local_seo", weekStart))) {
     log.push("PB16: already ran this week, skipping");

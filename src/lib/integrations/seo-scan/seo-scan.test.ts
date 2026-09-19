@@ -19,13 +19,34 @@ describe("weekly SEO scan target picker", () => {
     expect(picked.topicInput).toBe(CONTENT_TOPICS[0]);
   });
 
-  it("skips topics whose slug already exists on the site", () => {
-    const slug = CONTENT_TOPICS[0].toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
-    const picked = pickNextSeoTargets([`https://houstonsigncrafters.com/blog/${slug}`], {
-      matrixInputs: [],
-      topicInputs: [CONTENT_TOPICS[1]],
-    });
-    expect(picked.topicInput).toBe(CONTENT_TOPICS[2]);
+  it("prefers GSC gap queries over the backlog", () => {
+    const picked = pickNextSeoTargets([], { matrixInputs: [], topicInputs: [] }, [
+      "building signs houston",
+      "banners houston tx",
+    ]);
+    expect(picked.topicInput).toBe("building signs houston");
+  });
+
+  it("skips a gap query an existing page already covers, and near-duplicates of prior drafts", () => {
+    const picked = pickNextSeoTargets(
+      ["https://houstonsigncrafters.com/building-signs-houston"],
+      { matrixInputs: [], topicInputs: ["banners houston"] },
+      ["building signs houston", "banners houston tx", "sign shop houston"]
+    );
+    // First gap covered by the site, second is a near-duplicate of a prior draft
+    expect(picked.topicInput).toBe("sign shop houston");
+  });
+
+  it("regression: keyword coverage catches the permit-post near-duplicate a slug check missed", () => {
+    const picked = pickNextSeoTargets(
+      ["https://houstonsigncrafters.com/blog/houston-business-sign-permits"],
+      { matrixInputs: [], topicInputs: [] },
+      ["do i need a permit for a business sign in houston"]
+    );
+    // CONTENT_TOPICS[0] is the same question — both must be skipped as covered
+    expect(picked.topicInput).not.toBe("do i need a permit for a business sign in houston");
+    expect(picked.topicInput).not.toBe(CONTENT_TOPICS[0]);
+    expect(picked.topicInput).toBe(CONTENT_TOPICS[1]);
   });
 
   it("returns null when every target is exhausted", () => {
