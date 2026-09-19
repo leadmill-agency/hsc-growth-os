@@ -27,6 +27,16 @@ describe("weekly SEO scan target picker", () => {
     expect(picked.topicInput).toBe("building signs houston");
   });
 
+  it("never writes for off-focus gaps (banners, wraps, vinyl — outsourced work)", () => {
+    const picked = pickNextSeoTargets([], { matrixInputs: [], topicInputs: [] }, [
+      "banners houston tx",
+      "car wraps houston",
+      "vinyl lettering near me",
+      "pole signs houston",
+    ]);
+    expect(picked.topicInput).toBe("pole signs houston");
+  });
+
   it("skips a gap query an existing page already covers, and near-duplicates of prior drafts", () => {
     const picked = pickNextSeoTargets(
       ["https://houstonsigncrafters.com/building-signs-houston"],

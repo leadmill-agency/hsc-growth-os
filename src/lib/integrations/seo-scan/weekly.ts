@@ -37,13 +37,20 @@ export const SEO_GEOGRAPHIES = [
   "Rosenberg",
 ];
 
-// Products from the live site's service list (data/services.js), revenue order.
+// Business focus (Rameel 2026-09-19): exterior signage with $4k+ average
+// orders — pole/pylon, monument, storefront/channel letters. Banners, wall
+// vinyl, and vehicle wraps are outsourced pass-throughs and never get pages
+// or articles from this scan.
 export const SEO_PRODUCTS = [
   "Channel Letter Signs",
   "Monument Signs",
   "Storefront Signs",
-  "Vehicle Wraps",
+  "Pole Signs",
 ];
+
+/** Gap queries about outsourced, low-ticket work are never worth an article. */
+export const OFF_FOCUS_PATTERN =
+  /banner|vinyl|wrap|decal|wall graphic|yard sign|magnet|sticker|print|flag|poster/i;
 
 // Fallback topic backlog (per Rameel 2026-09-19 the PRIMARY topic source is
 // live GSC content gaps — queries the site already gets impressions for but
@@ -60,7 +67,7 @@ export const CONTENT_TOPICS = [
   "Landlord sign criteria: what tenants need to know before ordering a storefront sign",
   "Can you reface an existing sign instead of replacing it?",
   "LED vs neon signs for storefronts",
-  "What are ADA signage requirements for Texas businesses?",
+  "How tall can a pole sign be in the Houston area?",
   "How Houston wind load requirements affect sign design",
   "How to choose a sign company for a commercial project",
 ];
@@ -97,8 +104,9 @@ export function pickNextSeoTargets(
       return findCoveringUrls(sitemapUrls, [geo, product]).length === 0;
     }) ?? null;
 
+  const onFocusGaps = gapQueries.filter((q) => !OFF_FOCUS_PATTERN.test(q));
   const topicInput =
-    [...gapQueries, ...CONTENT_TOPICS].find((topic) => {
+    [...onFocusGaps, ...CONTENT_TOPICS].find((topic) => {
       if (priorInputs.topicInputs.some((prior) => topicsOverlap(prior, topic))) return false;
       return findTopicCoveringUrls(sitemapUrls, topic).length === 0;
     }) ?? null;
