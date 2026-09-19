@@ -69,6 +69,8 @@ export const CONTENT_TOPICS = [
   "LED vs neon signs for storefronts",
   "How tall can a pole sign be in the Houston area?",
   "How Houston wind load requirements affect sign design",
+  "Sign repair in Houston: repair, reface, or replace?",
+  "Is an LED retrofit worth it for an older sign?",
   "How to choose a sign company for a commercial project",
 ];
 
