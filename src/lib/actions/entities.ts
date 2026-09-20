@@ -154,13 +154,22 @@ export async function createOpportunity(
       where: eq(opportunities.accountId, input.accountId),
       orderBy: (o, { asc: ascOrder }) => [ascOrder(o.createdAt)],
     });
-    // Attach the new sighting to a still-working card when one exists;
-    // otherwise the terminal card (dismissed/won/lost) absorbs it silently.
+    // Attach the new sighting to a still-working card when one exists.
     const terminal = ["dismissed", "won", "lost"];
-    const existing = all.find((o) => !terminal.includes(o.stage ?? "")) ?? all[0];
-    if (existing) return { opportunity: existing, created: false as const };
-  }
-  if (input.accountId && input.projectId) {
+    const active = all.find((o) => !terminal.includes(o.stage ?? ""));
+    if (active) return { opportunity: active, created: false as const };
+    // A closed card (dismissed/won/lost) suppresses re-carding for 90 days
+    // from when it closed (Rameel 2026-09-19) — after that, a fresh signal
+    // about the company earns a fresh look in the inbox.
+    const SUPPRESSION_MS = 90 * 24 * 3600 * 1000;
+    const recentTerminal = all.find(
+      (o) => Date.now() - o.updatedAt.getTime() < SUPPRESSION_MS
+    );
+    if (recentTerminal) return { opportunity: recentTerminal, created: false as const };
+    // Suppression expired (or no cards at all): the account-wide check fully
+    // decided this account — skip the narrower legacy branches below, which
+    // would otherwise re-attach to the stale closed card forever.
+  } else if (input.accountId && input.projectId) {
     const existing = await db.query.opportunities.findFirst({
       where: and(
         eq(opportunities.accountId, input.accountId),

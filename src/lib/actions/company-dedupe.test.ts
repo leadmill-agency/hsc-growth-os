@@ -79,6 +79,30 @@ describe("account-wide opportunity dedupe", () => {
     expect(hit.id).toBe(active.id);
   });
 
+  it("suppression expires: a company dismissed 90+ days ago earns a fresh card", async () => {
+    const { account } = await createAccount(db, { name: "Chama Gaucha" });
+    const { opportunity: old } = await createOpportunity(db, {
+      name: "Chama Gaucha — Katy unit",
+      accountId: account.id,
+      stage: "discovered",
+      dedupeAccountWide: true,
+    });
+    const hundredDaysAgo = new Date(Date.now() - 100 * 24 * 3600 * 1000);
+    await db
+      .update(opportunities)
+      .set({ stage: "dismissed", updatedAt: hundredDaysAgo })
+      .where(eq(opportunities.id, old.id));
+
+    const { opportunity: fresh, created } = await createOpportunity(db, {
+      name: "Chama Gaucha — new Woodlands unit",
+      accountId: account.id,
+      stage: "discovered",
+      dedupeAccountWide: true,
+    });
+    expect(created).toBe(true);
+    expect(fresh.id).not.toBe(old.id);
+  });
+
   it("bids stay one card per project (flag not set): same GC, different projects", async () => {
     const { account } = await createAccount(db, { name: "Embree Construction Group" });
     const mk = async (proj: string) => {
