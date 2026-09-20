@@ -182,11 +182,27 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           source: p.source ?? "radar",
           sourceDetail: p.sourceUrl,
           ploybookRunId: ctx.runId,
+          // One radar card per company: the scout re-tells the same story with
+          // new wording daily, and a dismissed/won company must never re-enter
+          // the inbox on a re-sighting (Rameel 2026-09-19). Bids (PB10) stay
+          // one-card-per-project and don't use this flag.
+          dedupeAccountWide: true,
         });
         if (!created) {
+          const terminal = ["dismissed", "won", "lost"].includes(opportunity.stage ?? "");
+          if (terminal) {
+            await logActivity(ctx.db, {
+              entityType: "opportunity",
+              entityId: opportunity.id,
+              action: "radar.duplicate_suppressed",
+              detail: `New signal about ${account?.name ?? opportunity.name} suppressed — card already ${opportunity.stage}`,
+              actor: "system",
+              ploybookRunId: ctx.runId,
+            });
+          }
           return {
             kind: "completed",
-            outputs: { opportunityId: opportunity.id, deduped: true },
+            outputs: { opportunityId: opportunity.id, deduped: true, dedupedTerminal: terminal },
           };
         }
         await saveEvidence(ctx.db, {
@@ -216,6 +232,11 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         const resolved = ctx.priorOutputs["resolve_entities"];
         if (!resolved?.opportunityId) {
           return { kind: "skipped", reason: "No opportunity created" };
+        }
+        if (resolved.dedupedTerminal) {
+          // Never rescore or refresh a dismissed/won/lost card — a re-sighting
+          // must not resurrect it in any list or change what the human decided.
+          return { kind: "skipped", reason: "Duplicate of a closed card — suppressed" };
         }
         const parsed = ctx.priorOutputs["parse_signal"].parsed as z.infer<typeof signalParseSchema>;
         const opportunityId = resolved.opportunityId as string;

@@ -141,8 +141,25 @@ export async function createOpportunity(
     sourceDetail?: string;
     actor?: string;
     ploybookRunId?: string;
+    /** One card per COMPANY, any project (radar/scout signals): the scout
+     *  re-tells the same story daily with a new project-name variant, which
+     *  defeated (account, project) dedupe and re-carded dismissed companies
+     *  (Rameel 2026-09-19). Never set for bids — a GC legitimately gets one
+     *  card per project it invites us to. */
+    dedupeAccountWide?: boolean;
   }
 ) {
+  if (input.dedupeAccountWide && input.accountId) {
+    const all = await db.query.opportunities.findMany({
+      where: eq(opportunities.accountId, input.accountId),
+      orderBy: (o, { asc: ascOrder }) => [ascOrder(o.createdAt)],
+    });
+    // Attach the new sighting to a still-working card when one exists;
+    // otherwise the terminal card (dismissed/won/lost) absorbs it silently.
+    const terminal = ["dismissed", "won", "lost"];
+    const existing = all.find((o) => !terminal.includes(o.stage ?? "")) ?? all[0];
+    if (existing) return { opportunity: existing, created: false as const };
+  }
   if (input.accountId && input.projectId) {
     const existing = await db.query.opportunities.findFirst({
       where: and(
