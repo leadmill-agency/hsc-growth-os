@@ -16,7 +16,7 @@ export const QA_CHECKLIST_ITEMS = [
   "exclusions stated",
   "unit prices complete (if requested)",
   "schedule/lead times stated",
-  "supplier quotes received (awnings/canopies/backlit)",
+  "supplier quotes received (backlit)",
   "tax status correct",
   "bond included (if required)",
   "W-9 attached",

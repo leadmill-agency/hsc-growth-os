@@ -46,9 +46,8 @@ export const SEO_PRODUCTS = [
   "Monument Signs",
   "Storefront Signs",
   "Pole Signs",
-  // Growth line per Rameel 2026-09-19 — statewide service area, GC-bid heavy.
-  // Copy rule for these pages: designed/managed/installed, never "built in
-  // our shop" (awnings/canopies aren't fabricated in-house).
+  // Growth line per Rameel 2026-09-19 — statewide service area, GC-bid heavy,
+  // fabricated in-house like signs (Rameel corrected this 2026-09-19).
   "Commercial Awnings",
 ];
 

@@ -77,8 +77,9 @@ const VISION_PROMPT =
   "details, site plans with monument/pylon locations, and any specification pages. Extract " +
   "ONLY signage/awning/canopy scope you can actually see on these pages — never invent items. " +
   "sheet_or_spec_refs: the sheet numbers from title blocks (e.g. A-201, SG-1). fabrication: " +
-  "in_house for channel letters, cabinets, monuments, vinyl, interior signage; supplier_fab " +
-  "for awnings, canopies, and backlit signs; unclear otherwise. Quantities ONLY when a " +
+  "in_house for channel letters, cabinets, monuments, awnings, canopies, vinyl, interior " +
+  "signage (awnings/canopies in-house per Rameel 2026-09-19); supplier_fab for backlit " +
+  "signs; unclear otherwise. Quantities ONLY when a " +
   "schedule or callout explicitly states them — never count symbols to infer a quantity; put " +
   "what the sheet says in quantity_note with a confidence reflecting how explicit it is. " +
   "Risk flags to watch: electrical hookup, engineering/delegated design, structural " +
@@ -286,8 +287,8 @@ export const pb11BidAnalyzer: PloybookDefinition = {
             "You analyze construction bid documents for Houston Sign Crafters. Extract ONLY " +
             "signage, awning, and canopy scope actually present in the documents, with the file/" +
             "sheet/spec-section reference for every item. fabrication: in_house for channel " +
-            "letters, cabinets, monuments, vinyl, interior signage; supplier_fab for awnings, " +
-            "canopies, and backlit signs (HSC buys those); unclear otherwise. Quantities only " +
+            "letters, cabinets, monuments, awnings, canopies, vinyl, interior signage; " +
+            "supplier_fab for backlit signs (HSC buys those); unclear otherwise. Quantities only " +
             "when the text states them — put them in quantity_note with a confidence reflecting " +
             "how explicit the source is; NEVER infer quantities. Risk flags to watch: electrical " +
             "hookup, engineering/delegated design, bonding, liquidated damages, retainage, " +
