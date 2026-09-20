@@ -45,3 +45,47 @@ A PB is done only per its own Definition of Done. Phase order is master PRD §26
 - Cold outbound uses a separate sending domain, never the primary houstonsigncrafters.com mailbox.
 - Contact data from research (incl. radar PRD §16 seed names) must be verified via Apollo/LinkedIn before any email.
 - ABM/proposal pages are private + noindex. Never expose W-9s/COIs/bid docs publicly.
+
+## Field-learned rules (live ops, 2026-09 — each learned the hard way)
+
+- **Nothing researches by itself.** `AUTO_PURSUE_ENABLED` stays false; a human clicks Pursue.
+  Funnel: Opportunities = one triage inbox (Pursue / Bid this / Dismiss-with-reason) →
+  Researched hub (briefs + emails + bid desk). Dismissals REQUIRE a reason code — they feed
+  radar scoring as ground truth (except `unclear` = presentation feedback, and system
+  `opportunity.deduped` actions, which the feedback loop deliberately ignores).
+- **One radar card per company** (`dedupeAccountWide` in `createOpportunity`, used by PB05):
+  the scout re-tells the same story daily with new wording, so (account, project) dedupe
+  alone re-carded dismissed companies. Re-sightings attach to the active card; a closed card
+  (dismissed/won/lost) suppresses re-carding for **90 days** from close, then the company may
+  earn a fresh card. Bids stay one-card-per-project (never set the flag in PB10).
+- **Fortune-1000-scale corporate chains never become cards** (`national_chain` in PB05's
+  parse): their sign packages run through national vendor programs. Franchisee-driven
+  buildouts and emerging brands DO card — the local operator buys the signs. Skips are
+  logged to History (`radar.national_chain_skipped`).
+- **The boot sweep must not steal runs.** Scripts execute runs against the same database
+  from outside the server process; a boot sweep with `runningOlderThanMs: 0` adopted a
+  mid-draft run and produced duplicate approvals (2026-09-18). Runs heartbeat `updatedAt`
+  at each step start — boot threshold 10 min, steady 15 min. If a step ever has duplicate
+  approvals anyway, the runner honors the first human decision and supersedes the rest.
+- **Cross-bundle module state is unreliable in Next** (instrumentation vs server-action
+  bundles): the send layer lazily self-registers the Resend adapter. Never assume a
+  register-at-boot singleton is visible from a server action.
+- **Hard zod `.max()` on AI output is guidance-as-fatal** — it killed PB16/PB17/PB18 runs.
+  Keep limits out of the schema; clamp in code after generation. `z.toJSONSchema` throws on
+  `.transform`, so transforms can't do it either (verified live).
+- **Models copy the vocabulary they're shown**: pre-translate metrics/fields to plain
+  English before prompting (PB18 `describeMetrics`, brief composition from labeled text,
+  outreach never says "registered with TDLR"). Outreach voice = `OWNER_VOICE` in
+  `src/lib/actions/outreach.ts` (his real reply-getting emails; routing-question CTA;
+  one-thought paragraphs; brochure-speak banned).
+- **Weekly SEO scan** (`src/lib/integrations/seo-scan/weekly.ts`): Mondays after intake,
+  PB16 drafts one city × product page and PB17 one article, behind publish approvals.
+  Topics come from live GSC content gaps first (backlog fallback), filtered by
+  `OFF_FOCUS_PATTERN` (banners/vinyl/wraps never get content — outsourced-lead territory,
+  see HSC/CLAUDE.md business focus). Coverage/dedupe is keyword-STEM based
+  (`findTopicCoveringUrls` / `topicsOverlap` in the sitemap integration) — a slug-substring
+  check shipped a near-duplicate of an existing blog post. Manual run:
+  `npx tsx scripts/run-seo-scan-now.ts`. When a draft overlaps an existing page, MERGE the
+  new material into that URL; never publish a twin.
+- **Canopy/awning scope is valid STATEWIDE** and never auto-passes; signage-only is
+  ~150 mi of Houston. PB10 PASS recommendations auto-close visibly (activity + reason).
