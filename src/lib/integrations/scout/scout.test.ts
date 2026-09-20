@@ -52,6 +52,7 @@ const radarParse = {
   opportunity_type: "franchise expansion",
   estimated_construction_value_usd: null,
   estimated_relevance_score: 82,
+  national_chain: false,
   why_this_matters: "100-store Texas rollout with Houston sites in construction — repeatable signage program.",
   suggested_ploybook: "pb03",
   unknowns: [],

@@ -136,6 +136,7 @@ describe("Harvey Golden Path", () => {
           project_name: "Office Warehouse at Rankin",
           project_address: null,
           estimated_relevance_score: 75,
+          national_chain: false,
         }),
       })
     );

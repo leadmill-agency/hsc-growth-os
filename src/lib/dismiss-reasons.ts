@@ -7,6 +7,7 @@ export const DISMISS_REASONS: [string, string][] = [
   ["too_small", "Too small to chase"],
   ["wrong_company", "Research got the wrong company"],
   ["has_vendor", "They already have a sign vendor"],
+  ["national_chain", "National chain — corporate sign program, beyond our scale"],
   ["residential_or_civic", "Residential / civic — not our buyer"],
   ["bad_timing", "Real, but timing is off"],
   ["duplicate", "Duplicate of another card"],

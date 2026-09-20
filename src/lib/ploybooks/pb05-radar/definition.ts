@@ -19,6 +19,9 @@ const signalParseSchema = z.object({
   project_address: z.string().nullable(), // street address when the signal states one
   city: z.string().nullable(),
   trade_relevance: z.enum(["explicit_signage", "likely_signage", "adjacent", "irrelevant"]),
+  // Fortune-1000-scale corporate chains buy signs through national programs —
+  // not winnable at HSC's size (Rameel 2026-09-19), so no card is created.
+  national_chain: z.boolean(),
   opportunity_type: z.string().max(60), // short label, not a sentence
   estimated_construction_value_usd: z.number().nullable(), // only when the signal states it
   estimated_relevance_score: z.number().min(0).max(100),
@@ -98,6 +101,16 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "Acme Dental'), the tenant is the one who buys signs — extract the tenant as " +
             "company_name (company_type 'other' unless clearly a franchise/operator) and score " +
             "at the TOP of the band; a named tenant beats a named owner or GC as a signal. " +
+            "NATIONAL CHAIN RULE (from the owner): set national_chain=true when the company " +
+            "is a large corporate-run national chain — Fortune-1000 scale, hundreds of " +
+            "company-owned locations, centralized sign programs with locked-in national " +
+            "vendors (think Whataburger, Five Below, Ross, Planet Fitness corporate, Target). " +
+            "We can't win those at our size, so no card gets created. national_chain=false " +
+            "when the buildout is FRANCHISEE-driven or the brand is emerging: a local " +
+            "franchisee, a multi-unit operator building THEIR locations, or a brand's first " +
+            "Texas units — there the local operator buys the signs and we can win. When " +
+            "unsure whether corporate or franchisee is building, national_chain=false and say " +
+            "so in unknowns. " +
             "opportunity_type is a SHORT label (2-4 words, e.g. 'new " +
             "construction', 'commercial remodel') — never a sentence. " +
             "estimated_construction_value_usd only when the signal states a dollar figure. " +
@@ -106,9 +119,10 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "these anchors and use the FULL range — never park everything at a safe middle " +
             "value; two different signals should almost never share a score: " +
             "92 = active Houston bid invite explicitly naming signage/awning scope. " +
-            "85 = a recognizable BRAND, franchise, or multi-location operator moving in (named " +
+            "85 = an emerging brand, franchise, or multi-location operator moving in (named " +
             "tenant build-out or certificate of occupancy) — they need signs on a known " +
-            "timeline and can buy again. " +
+            "timeline and can buy again (corporate mega-chains are national_chain=true " +
+            "instead, never 85). " +
             "80 = ground-up retail/restaurant/hotel in the Houston metro, $1M+ — signage " +
             "near-certain even if unstated. " +
             "74 = an independent small business moving in (CO or finish-out with a business " +
@@ -149,6 +163,23 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         }
         // Permit-style signals (e.g. TDLR) often name a facility/project but no company.
         // Anchor on the project and leave the account null — identifying the owner/GC is
+        // Fortune-1000-scale corporate chains never become cards (Rameel
+        // 2026-09-19: "we aren't big enough at scale to get those") — logged
+        // to History so the decision is visible, then nothing is created.
+        if (parsed.national_chain && parsed.company_name) {
+          await logActivity(ctx.db, {
+            entityType: "ploybook_run",
+            entityId: ctx.runId,
+            action: "radar.national_chain_skipped",
+            detail: `${parsed.company_name} skipped — corporate national chain, sign package goes through their national program`,
+            actor: "system",
+            ploybookRunId: ctx.runId,
+          });
+          return {
+            kind: "completed",
+            outputs: { skippedNationalChain: true },
+          };
+        }
         // the recommended next action, never a fabricated account (§5.4).
         const account = parsed.company_name
           ? (
