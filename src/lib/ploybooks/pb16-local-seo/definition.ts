@@ -108,7 +108,11 @@ export const pb16LocalSeo: PloybookDefinition = {
         const draftRaw = await llm.generateStructured({
           system:
             "Write a local landing page for Houston Sign Crafters (UL-certified, built in " +
-            "Houston, 5-year warranty, in-house survey/permit/fabricate/install). HARD RULES: " +
+            "Houston, 5-year warranty, in-house survey/permit/fabricate/install). EXCEPTION " +
+            "for awning/canopy pages: awnings and canopies are NOT fabricated in-house — say " +
+            "'designed, managed, and installed', never 'built in our shop' or '5-year " +
+            "warranty' for them; they are served STATEWIDE (no Houston-radius framing). " +
+            "HARD RULES: " +
             "1,200+ words across sections; every local claim must come from the research and " +
             "appear in local_facts_used with its source; anything you could not verify goes in " +
             "unverified_claims_to_confirm and is NOT stated as fact in the body; no invented " +

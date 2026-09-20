@@ -46,6 +46,10 @@ export const SEO_PRODUCTS = [
   "Monument Signs",
   "Storefront Signs",
   "Pole Signs",
+  // Growth line per Rameel 2026-09-19 — statewide service area, GC-bid heavy.
+  // Copy rule for these pages: designed/managed/installed, never "built in
+  // our shop" (awnings/canopies aren't fabricated in-house).
+  "Commercial Awnings",
 ];
 
 /** Gap queries about outsourced, low-ticket work are never worth an article. */
@@ -71,6 +75,9 @@ export const CONTENT_TOPICS = [
   "How Houston wind load requirements affect sign design",
   "Sign repair in Houston: repair, reface, or replace?",
   "Is an LED retrofit worth it for an older sign?",
+  "Do commercial awnings need a permit in Texas?",
+  "Fabric awning vs metal canopy for a commercial building",
+  "Walkway canopies for schools and churches: what does the project involve?",
   "How to choose a sign company for a commercial project",
 ];
 
