@@ -18,11 +18,11 @@ export const GENERAL_GUIDE = {
   intro:
     "Growth OS is a funnel: Opportunities (everything found, unreviewed) → Pursue → Researched (briefs and contacts, ready to act on). It never sends an email, publishes a page, or submits a bid on its own — you review and fire every external action yourself.",
   rhythm: [
-    "Every morning the system pulls new construction filings (TDLR, 39 counties around Houston), Houston certificates of occupancy (businesses moving in), a web scan for franchise expansions and developments, and any PlanHub bid invites forwarded from email — all scored into Opportunities. That tab is the triage inbox: everything unreviewed, best first.",
-    "On a normal card, Pursue starts the research: who's behind it, contacts, fit (~5 minutes). On an incoming bid invite the button says 'Bid this' — clicking it means we're bidding, and the bid moves to Researched → Bids Interested In. Dismiss drops a card for good.",
+    "Every morning the system pulls new construction filings (TDLR, 39 counties around Houston), Houston certificates of occupancy (businesses moving in), a web scan for franchise expansions and developments, and any PlanHub bid invites forwarded from email — all scored into Opportunities — one compact table, best first. Rollouts (franchises, multi-unit operators, developments — the enterprise targets) are the default tab; one-off projects sit on their own tab and quietly archive after 7 idle days (Keep holds one; a fresh signal resurfaces an archived card); bid invites have a third tab.",
+    "On a normal card, Pursue starts the research: who's behind it, contacts, fit (~5 minutes). On an incoming bid invite the button says 'Bid this' — clicking it means we're bidding, and the bid moves to Researched → Bids. Dismiss drops a card for good (with a reason — that teaches the radar).",
     "Nothing researches by itself. The system finds and scores; you choose. Every Pursue click is one research run (~5 minutes, a few dozen cents) that lands in Researched.",
-    "Researched → Researched Opportunities is where you act: each card has the brief, contacts, and website, plus three buttons — Write email (finds the contact's address and drafts in Ray's voice; you edit and send), Company swarm (drafts to several people at the company), and ABM page (a personalized sales page).",
-    "Researched → Bids Interested In is the bid desk: upload the plans zip for an estimator brief, Run QA before submitting, Mark submitted (starts automatic Day-2/7/14/30 follow-up drafts), then We won / We lost.",
+    "Researched → Companies is where you act: each card has the bottom line, a plain-English 'how to approach' (who to email first and why), contact chips showing whether an email address is in hand, and three buttons — Write email (drafts in Ray's voice), Company swarm (several people at once), and ABM page. Every draft lands in Researched → Outbox, where you review, edit, and approve — nothing sends without you.",
+    "Researched → Bids is the bid desk: upload the plans zip for an estimator brief, Run QA before submitting, Mark submitted (starts automatic Day-2/7/14/30 follow-up drafts), then We won / We lost.",
     "Long jobs run in the background for a few minutes. Refresh the page; Ploybooks → Recent runs shows progress.",
   ],
   scores:
@@ -181,7 +181,7 @@ export const PLOYBOOK_GUIDES: Record<string, PloybookGuide> = {
     whatHappens:
       "It checks 16 items — addenda acknowledged, supplier quotes received, W-9, COI, signature, the deadline hasn't passed — and says READY or NOT READY with the blockers.",
     whatYouGet:
-      "A checklist card under the bid in Researched → Bids Interested In. Submit the bid yourself (portal or email), then hit Mark submitted on the bid card — that starts the follow-up plan automatically.",
+      "A checklist card under the bid in Researched → Bids. Submit the bid yourself (portal or email), then hit Mark submitted on the bid card — that starts the follow-up plan automatically.",
   },
   pb13_bid_followup: {
     key: "pb13_bid_followup",
