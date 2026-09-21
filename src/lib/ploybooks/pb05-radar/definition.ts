@@ -311,23 +311,36 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           sourceName: "pb05_radar",
           verificationStatus: "inferred",
         });
-        await logActivity(ctx.db, {
-          entityType: "opportunity",
-          entityId: opportunityId,
-          action: "opportunity.discovered",
-          detail: `${parsed.estimated_relevance_score} — ${parsed.why_this_matters}`,
-          ploybookRunId: ctx.runId,
-        });
-        await emitEvent(ctx.db, {
-          eventType: "opportunity.discovered",
-          opportunityId,
-          ploybookRunId: ctx.runId,
-          payload: {
-            score: parsed.estimated_relevance_score,
-            whyThisMatters: parsed.why_this_matters,
-            suggestedPloybook: parsed.suggested_ploybook,
-          },
-        });
+        // A re-sighting of an existing active card is not a new discovery —
+        // logging it as one made known cards read like daily repeats.
+        if (resolved.deduped) {
+          await logActivity(ctx.db, {
+            entityType: "opportunity",
+            entityId: opportunityId,
+            action: "radar.re_sighted",
+            detail: `Seen again (rescored ${Math.round(parsed.estimated_relevance_score)})`,
+            actor: "system",
+            ploybookRunId: ctx.runId,
+          });
+        } else {
+          await logActivity(ctx.db, {
+            entityType: "opportunity",
+            entityId: opportunityId,
+            action: "opportunity.discovered",
+            detail: `${parsed.estimated_relevance_score} — ${parsed.why_this_matters}`,
+            ploybookRunId: ctx.runId,
+          });
+          await emitEvent(ctx.db, {
+            eventType: "opportunity.discovered",
+            opportunityId,
+            ploybookRunId: ctx.runId,
+            payload: {
+              score: parsed.estimated_relevance_score,
+              whyThisMatters: parsed.why_this_matters,
+              suggestedPloybook: parsed.suggested_ploybook,
+            },
+          });
+        }
         return {
           kind: "completed",
           outputs: {

@@ -25,6 +25,24 @@ export function normalizeDomain(input?: string | null): string | null {
 }
 
 /** Find-or-create an account. Dedupes by domain first, then slug. */
+// Corporate dressing that shouldn't decide whether two names are the same company.
+const ACCOUNT_NAME_NOISE = new Set([
+  "inc", "llc", "lp", "llp", "ltd", "co", "corp", "corporation", "company",
+  "group", "holdings", "the", "of", "and", "dba",
+]);
+
+/** Meaningful word stems of a company name (plural s stripped, suffixes out). */
+export function accountNameStems(name: string): Set<string> {
+  return new Set(
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 2 && !ACCOUNT_NAME_NOISE.has(w))
+      .map((w) => (w.length > 3 ? w.replace(/s$/, "") : w))
+  );
+}
+
 export async function createAccount(
   db: Db,
   input: {
@@ -47,6 +65,26 @@ export async function createAccount(
   const slug = slugify(input.name);
   const bySlug = await db.query.accounts.findFirst({ where: eq(accounts.slug, slug) });
   if (bySlug) return { account: bySlug, created: false as const };
+
+  // Name-variant dedupe (2026-09-21): the LLM writes "Ideal Dental (DECA
+  // Dental)" one day and "Ideal Dental (DECA Dental Group)" the next — new
+  // slug, new account, and the account-wide opportunity dedupe silently
+  // missed a dismissed company. Same company when one name's word stems are
+  // a subset of the other's (at least 2 stems; corporate suffixes ignored).
+  const stems = accountNameStems(input.name);
+  if (stems.size >= 2) {
+    const all = await db.query.accounts.findMany({ columns: { id: true, name: true } });
+    const variant = all.find((a) => {
+      const other = accountNameStems(a.name);
+      if (other.size < 2) return false;
+      const [small, big] = stems.size <= other.size ? [stems, other] : [other, stems];
+      return [...small].every((s) => big.has(s));
+    });
+    if (variant) {
+      const full = await db.query.accounts.findFirst({ where: eq(accounts.id, variant.id) });
+      if (full) return { account: full, created: false as const };
+    }
+  }
 
   const [account] = await db
     .insert(accounts)

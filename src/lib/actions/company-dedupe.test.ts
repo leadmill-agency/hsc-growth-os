@@ -20,6 +20,24 @@ afterEach(() => {
   resetDbForTests();
 });
 
+describe("account name-variant dedupe", () => {
+  it("LLM name variants resolve to the SAME account (the DECA Dental leak)", async () => {
+    const { account: a } = await createAccount(db, { name: "Ideal Dental (DECA Dental)" });
+    const { account: b, created } = await createAccount(db, {
+      name: "Ideal Dental (DECA Dental Group)",
+    });
+    expect(created).toBe(false);
+    expect(b.id).toBe(a.id);
+  });
+
+  it("different companies sharing a word do NOT merge", async () => {
+    const { account: a } = await createAccount(db, { name: "Swish Dental" });
+    const { account: b, created } = await createAccount(db, { name: "Smile Dental" });
+    expect(created).toBe(true);
+    expect(b.id).not.toBe(a.id);
+  });
+});
+
 describe("account-wide opportunity dedupe", () => {
   it("a dismissed company never gets a second radar card, whatever the project variant", async () => {
     const { account } = await createAccount(db, { name: "Freddy's Frozen Custard" });
