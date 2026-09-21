@@ -315,7 +315,11 @@ export default async function OpportunitiesPage({
                           name="dismissReason"
                           required
                           defaultValue=""
-                          className="rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
+                          // w-32 caps the CLOSED width — a select's intrinsic width is its
+                          // longest option, and one long reason label crushed every card's
+                          // name column to a sliver (2026-09-20). The open dropdown still
+                          // shows full labels.
+                          className="w-32 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
                           title="Required — every dismissal teaches the radar what to score lower"
                         >
                           <option value="" disabled>

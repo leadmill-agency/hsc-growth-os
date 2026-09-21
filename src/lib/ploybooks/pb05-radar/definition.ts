@@ -201,8 +201,16 @@ export const pb05OpportunityRadar: PloybookDefinition = {
               ploybookRunId: ctx.runId,
             })
           : { project: null };
+        // The LLM's project_name often repeats the brand ("Fitstop — First
+        // Texas studio"), which produced "Fitstop — Fitstop — …" card names.
+        const projectPart = project
+          ? project.name.replace(
+              new RegExp(`^${account?.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") ?? ""}\\s*[—–-]+\\s*`, "i"),
+              ""
+            )
+          : null;
         const oppName = account
-          ? `${account.name}${project ? ` — ${project.name}` : ""}`
+          ? `${account.name}${projectPart ? ` — ${projectPart}` : ""}`
           : `${project!.name} (owner unknown)`;
         const { opportunity, created } = await createOpportunity(ctx.db, {
           name: oppName,
