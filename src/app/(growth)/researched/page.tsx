@@ -17,6 +17,7 @@ import {
   resolveApprovalAction,
   setOpportunityStageAction,
   addContactEmailAction,
+  cancelQueuedSendAction,
 } from "@/app/actions";
 import { EmailApprovalCard, SwarmApprovalCard } from "./email-card";
 import { BidDesk } from "./bid-desk";
@@ -122,6 +123,27 @@ export default async function ResearchedPage({
     ),
     orderBy: desc(approvals.requestedAt),
   });
+  // Approved emails waiting in the human-cadence send queue (9am–5:30pm CT,
+  // ~5 min apart) — cancellable until the moment they go out.
+  const scheduledSends = (
+    await db.query.approvals.findMany({
+      where: and(
+        inArray(approvals.approvalType, EMAIL_TYPES),
+        inArray(approvals.status, ["approved", "edited"])
+      ),
+      orderBy: desc(approvals.resolvedAt),
+      limit: 100,
+    })
+  )
+    .filter((a) => {
+      const p = a.payload as { queuedSend?: { sendAt: string }; sentAt?: string };
+      return p.queuedSend && !p.sentAt;
+    })
+    .sort((a, b) => {
+      const at = (x: typeof a) => new Date((x.payload as { queuedSend: { sendAt: string } }).queuedSend.sendAt).getTime();
+      return at(a) - at(b);
+    });
+
   const recentlySent = (
     await db.query.approvals.findMany({
       where: and(
@@ -203,7 +225,7 @@ export default async function ResearchedPage({
             <Link href="/history" className="underline">History</Link>.
           </p>
 
-          {outboxCount === 0 && recentlySent.length === 0 && (
+          {outboxCount === 0 && scheduledSends.length === 0 && recentlySent.length === 0 && (
             <p className="text-sm text-steel">
               Outbox is empty. Hit <span className="font-medium">Write email</span> or{" "}
               <span className="font-medium">Company swarm</span> on a company card and the
@@ -250,6 +272,40 @@ export default async function ResearchedPage({
                   </div>
                 </div>
               ))}
+            </section>
+          )}
+
+          {scheduledSends.length > 0 && (
+            <section className="space-y-1">
+              <h2 className="text-sm font-semibold text-ink-700">
+                Scheduled ({scheduledSends.length}) — sends 9am–5:30pm, ~5 min apart
+              </h2>
+              {scheduledSends.map((a) => {
+                const q = (a.payload as { queuedSend: { to: string; subject: string; sendAt: string } }).queuedSend;
+                return (
+                  <div key={a.id} className="flex items-center gap-2 rounded border border-cloud bg-white px-3 py-1.5 text-xs">
+                    <span className="text-signal">→</span>
+                    <span className="min-w-0 flex-1 truncate text-ink-700">
+                      {q.to} — {q.subject}
+                    </span>
+                    <span className="text-steel">
+                      sends{" "}
+                      {new Date(q.sendAt).toLocaleString("en-US", {
+                        timeZone: "America/Chicago",
+                        weekday: "short",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                    <form action={cancelQueuedSendAction}>
+                      <input type="hidden" name="approvalId" value={a.id} />
+                      <SubmitButton className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal">
+                        Cancel
+                      </SubmitButton>
+                    </form>
+                  </div>
+                );
+              })}
             </section>
           )}
 

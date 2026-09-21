@@ -212,14 +212,18 @@ export async function resolveApprovalAction(formData: FormData) {
         subject &&
         body
       ) {
-        const { sendExternal } = await import("@/lib/outbound/send");
-        await sendExternal(db, approvalId, {
+        // Human cadence (Rameel 2026-09-21): approving QUEUES the email —
+        // delivery happens 9:00am–5:30pm Houston time on weekdays, ~5 minutes
+        // apart, so a batch approved at night drips out the next morning.
+        const { queueEmail } = await import("@/lib/outbound/send-queue");
+        const sendAt = await queueEmail(db, approvalId, {
           channel: "email",
           to: recipientEmail,
           subject,
           body,
           opportunityId: payload.opportunityId,
         });
+        console.log(`[send-queue] approval ${approvalId} queued for ${sendAt.toISOString()}`);
         if (payload.followupId) {
           await db
             .update(followups)
@@ -642,6 +646,34 @@ export async function addContactEmailAction(formData: FormData) {
   const fd = new FormData();
   fd.set("opportunityId", opportunityId);
   await writeEmailAction(fd);
+}
+
+// Cancel a queued email before it goes out: back to an editable pending
+// draft, nothing sends.
+export async function cancelQueuedSendAction(formData: FormData) {
+  const approvalId = String(formData.get("approvalId") ?? "");
+  if (!approvalId) return;
+  const db = await getDb();
+  const { approvals } = await import("@/lib/db/schema");
+  const { eq, sql } = await import("drizzle-orm");
+  await db
+    .update(approvals)
+    .set({
+      status: "pending",
+      resolvedAt: null,
+      resolvedBy: null,
+      payload: sql`${approvals.payload} - 'queuedSend'`,
+    })
+    .where(eq(approvals.id, approvalId));
+  const { logActivity } = await import("@/lib/events");
+  await logActivity(db, {
+    entityType: "approval",
+    entityId: approvalId,
+    action: "outreach.unqueued",
+    detail: "Scheduled send canceled by owner — back to a pending draft",
+    actor: "user",
+  });
+  revalidatePath("/researched");
 }
 
 // Keep button on expiring one-off rows (Rameel 2026-09-21): pins the card so

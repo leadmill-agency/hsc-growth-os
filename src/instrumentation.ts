@@ -159,6 +159,22 @@ export async function register() {
     }
   };
 
+  // Minute-level send-queue tick: queued emails deliver 9:00am–5:30pm Houston
+  // time, ~5 minutes apart (Rameel 2026-09-21) — needs finer granularity than
+  // the 15-minute tick. One cheap query when the queue is empty.
+  const sendQueueTick = async () => {
+    try {
+      const { getDb } = await import("@/lib/db/client");
+      const db = await getDb();
+      const { processSendQueue } = await import("@/lib/outbound/send-queue");
+      const sent = await processSendQueue(db);
+      if (sent) console.log(`[send-queue] delivered ${sent} queued email(s)`);
+    } catch (err) {
+      console.error("[send-queue] tick failed:", err);
+    }
+  };
+  setInterval(sendQueueTick, 60 * 1000);
+
   setInterval(tick, 15 * 60 * 1000);
   void bootSweep().then(() => tick());
   console.log("[scheduler] enabled (orphan resume, events, follow-ups, TDLR daily pull)");
