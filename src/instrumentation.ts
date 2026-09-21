@@ -117,6 +117,15 @@ export async function register() {
       console.error("[scheduler] TDLR pull failed:", err);
     }
 
+    // One-off cards idle 7 days quietly archive (rollouts and pinned never do)
+    try {
+      const { archiveStaleOneOffs } = await import("@/lib/actions/archive-sweep");
+      const archived = await archiveStaleOneOffs(db);
+      if (archived) console.log(`[scheduler] archived ${archived} stale one-off card(s)`);
+    } catch (err) {
+      console.error("[scheduler] archive sweep failed:", err);
+    }
+
     // Weekly SEO + content scan (per Rameel 2026-09-18): Mondays after the
     // morning intake, PB16 drafts one city × product page and PB17 one buyer-
     // question article. "Due" is week-based, so a Monday outage just means the

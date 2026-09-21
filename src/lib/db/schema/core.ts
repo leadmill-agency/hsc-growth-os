@@ -117,6 +117,11 @@ export const opportunities = pgTable("opportunities", {
   nextActionDueAt: timestamp("next_action_due_at", { withTimezone: true }),
   source: text("source"),
   sourceDetail: text("source_detail"),
+  // 'rollout' = franchise/multi-unit/development — the enterprise targets the
+  // portal exists for; 'one_off' = single project (Rameel 2026-09-21). One-offs
+  // idle for 7 days auto-archive unless pinned; rollouts never expire.
+  scale: text("scale"),
+  pinned: boolean("pinned").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

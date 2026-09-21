@@ -22,6 +22,9 @@ const signalParseSchema = z.object({
   // Fortune-1000-scale corporate chains buy signs through national programs —
   // not winnable at HSC's size (Rameel 2026-09-19), so no card is created.
   national_chain: z.boolean(),
+  // 'rollout' = repeat-buyer at stake (franchise/multi-unit/development);
+  // 'one_off' = a single project. Drives the inbox split (Rameel 2026-09-21).
+  scale: z.enum(["rollout", "one_off"]),
   opportunity_type: z.string().max(60), // short label, not a sentence
   estimated_construction_value_usd: z.number().nullable(), // only when the signal states it
   estimated_relevance_score: z.number().min(0).max(100),
@@ -111,6 +114,13 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "Texas units — there the local operator buys the signs and we can win. When " +
             "unsure whether corporate or franchisee is building, national_chain=false and say " +
             "so in unknowns. " +
+            "SCALE RULE (from the owner — this portal hunts enterprise contracts): scale=" +
+            "'rollout' when a RELATIONSHIP with repeat purchases is at stake — franchise " +
+            "expansions and area development agreements, brands entering Texas or a new " +
+            "market, operators with 3+ locations, multi-tenant developments and retail " +
+            "centers, system-wide rebrands/conversions. scale='one_off' when it is a single " +
+            "business in a single space (one CO, one finish-out, one filing). When torn, " +
+            "one_off — the rollout list must stay trustworthy. " +
             "opportunity_type is a SHORT label (2-4 words, e.g. 'new " +
             "construction', 'commercial remodel') — never a sentence. " +
             "estimated_construction_value_usd only when the signal states a dollar figure. " +
@@ -227,7 +237,33 @@ export const pb05OpportunityRadar: PloybookDefinition = {
           // one-card-per-project and don't use this flag.
           dedupeAccountWide: true,
         });
+        if (created) {
+          await ctx.db
+            .update(opportunities)
+            .set({ scale: parsed.scale })
+            .where(eq(opportunities.id, opportunity.id));
+        }
         if (!created) {
+          // A fresh signal about an ARCHIVED one-off is new information — the
+          // card quietly resurfaces instead of the signal vanishing.
+          if (opportunity.stage === "archived") {
+            await ctx.db
+              .update(opportunities)
+              .set({ stage: "discovered", updatedAt: new Date() })
+              .where(eq(opportunities.id, opportunity.id));
+            await logActivity(ctx.db, {
+              entityType: "opportunity",
+              entityId: opportunity.id,
+              action: "opportunity.resurfaced",
+              detail: `${opportunity.name} resurfaced — new signal after auto-archive`,
+              actor: "system",
+              ploybookRunId: ctx.runId,
+            });
+            return {
+              kind: "completed",
+              outputs: { opportunityId: opportunity.id, deduped: true },
+            };
+          }
           const terminal = ["dismissed", "won", "lost"].includes(opportunity.stage ?? "");
           if (terminal) {
             await logActivity(ctx.db, {

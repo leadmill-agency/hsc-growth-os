@@ -1,156 +1,110 @@
 import { getDb } from "@/lib/db/client";
 import { SubmitButton } from "@/app/(growth)/submit-button";
 import { DISMISS_REASONS } from "@/lib/dismiss-reasons";
-import { opportunities, projects, evidence, contacts } from "@/lib/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { opportunities, evidence } from "@/lib/db/schema";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import {
   pursueOpportunityAction,
   pullTdlrAction,
   setOpportunityStageAction,
+  pinOpportunityAction,
 } from "@/app/actions";
+import { ONE_OFF_TTL_MS } from "@/lib/actions/archive-sweep";
 
 export const dynamic = "force-dynamic";
 
-// §15.2 Opportunity Inbox — cards, not a cramped table: score badge, short type,
-// project value, "why this matters", and a human-readable next action.
+// The triage inbox as ONE COMPACT TABLE (Rameel 2026-09-21): this portal hunts
+// enterprise contracts, so rollouts (franchise/multi-unit/development) are the
+// default tab, one-off projects sit on the side and auto-archive after 7 idle
+// days (Keep pins one), and bid invites have their own tab. Rich cards only
+// exist AFTER Pursue — in Researched.
 
-function scoreBadge(score: number | null) {
-  if (score == null) return { label: "—", cls: "bg-cloud text-steel" };
-  if (score >= 85) return { label: String(score), cls: "bg-signal text-white" };
-  if (score >= 70) return { label: String(score), cls: "bg-ink text-white" };
-  if (score >= 50) return { label: String(score), cls: "bg-amber-100 text-amber-900" };
-  return { label: String(score), cls: "bg-cloud text-steel" };
+function scoreCls(score: number | null) {
+  if (score == null) return "text-steel";
+  if (score >= 85) return "text-signal font-semibold";
+  if (score >= 70) return "text-ink font-semibold";
+  return "text-steel";
 }
 
-// Label + what actually happens if you hit Pursue on it (shown as a tooltip —
-// "Review" vs "Map the development" was opaque, per Rameel 2026-09-10).
-const nextActionLabels: Record<string, { label: string; help: string }> = {
-  "Launch pb01_gc_pursuit": {
-    label: "Pursue as GC bid",
-    help: "Radar thinks a GC is taking bids here. Pursue researches the GC and drafts an intro email for your approval.",
-  },
-  "Launch pb02": {
-    label: "Map the development",
-    help: "Radar spotted a multi-tenant development. Pursue breaks it into every individual sign opportunity (tenants, monument, wayfinding).",
-  },
-  "Launch pb03": {
-    label: "Pursue franchise rollout",
-    help: "Radar spotted a franchise expanding. Pursue researches their Texas rollout and drafts outreach to the franchising team.",
-  },
-  "Launch pb04": {
-    label: "Pursue facility portfolio",
-    help: "Radar spotted a multi-location operator. Pursue maps their locations and drafts a portfolio pitch.",
-  },
-  review: {
-    label: "Needs your read",
-    help: "The radar wasn't confident what this is — open the original signal below and decide. Pursue still works: it researches the owner first.",
-  },
-  "Identify owner/GC first (research)": {
-    label: "Identify owner/GC first",
-    help: "Nobody is named on this filing yet. Pursue starts by finding out who owns the project before any outreach.",
-  },
-};
-
-const sourceLabels: Record<string, string> = {
-  tdlr: "TDLR filing",
-  coh_co: "New CO (business moving in)",
+const sourceShort: Record<string, string> = {
+  tdlr: "TDLR",
+  coh_co: "New CO",
   web_scout: "Web scout",
-  manual_signal: "Pasted signal",
+  manual_signal: "Pasted",
   website_intent: "Website visitor",
-  pb01: "GC pursuit",
-  pb02: "Development",
-  pb03: "Franchise rollout",
-  pb04: "Portfolio",
-  radar: "Radar",
+  email_inbound: "Bid email",
+  planhub: "PlanHub",
 };
 
-// Filter chips (per Rameel 2026-09-10): one per signal source.
-const sourceFilters: { key: string; label: string; sources: string[] }[] = [
-  { key: "tdlr", label: "TDLR filings", sources: ["tdlr"] },
-  { key: "coh", label: "New COs", sources: ["coh_co"] },
-  { key: "web", label: "Web scout", sources: ["web_scout"] },
-  { key: "other", label: "Other", sources: [] }, // everything not in the lists above
-];
-const knownSources = sourceFilters.flatMap((f) => f.sources);
+const TABS = [
+  { key: "rollouts", label: "Rollouts" },
+  { key: "oneoffs", label: "One-off projects" },
+  { key: "bids", label: "Bid invites" },
+] as const;
+
+function daysAgo(d: Date) {
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  return days <= 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
+}
 
 export default async function OpportunitiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
-  const { source: activeFilter } = await searchParams;
+  const { tab: tabParam } = await searchParams;
+  const tab = TABS.some((t) => t.key === tabParam) ? (tabParam as string) : "rollouts";
   const db = await getDb();
-  const { sql, notInArray } = await import("drizzle-orm");
-  const filter = sourceFilters.find((f) => f.key === activeFilter);
-  const sourceWhere = filter
-    ? filter.sources.length
-      ? inArray(opportunities.source, filter.sources)
-      : notInArray(sql`coalesce(${opportunities.source}, '')`, knownSources)
-    : undefined;
-  // The TRIAGE inbox (per Rameel 2026-09-10): everything unreviewed from every
-  // source — TDLR, COs, web scout, AND incoming bid invites. Pursue moves a
-  // card into research (or, for a bid, onto the bid desk); Dismiss drops it.
-  // Anything pursued/researched/decided lives in Researched, not here.
-  const openStages = inArray(opportunities.stage, ["discovered", "bid_invited"]);
-  const where = sourceWhere ? and(openStages, sourceWhere) : openStages;
-  // Best first (per Rameel): score desc, newest breaks ties.
+  const { sql } = await import("drizzle-orm");
+
+  const isRollout = eq(opportunities.scale, "rollout");
+  const isOneOff = or(eq(opportunities.scale, "one_off"), isNull(opportunities.scale))!;
+  const tabWhere =
+    tab === "bids"
+      ? eq(opportunities.stage, "bid_invited")
+      : tab === "rollouts"
+        ? and(eq(opportunities.stage, "discovered"), isRollout)!
+        : and(eq(opportunities.stage, "discovered"), isOneOff)!;
+
   const rows = await db.query.opportunities.findMany({
-    where,
+    where: tabWhere,
     orderBy: [
       desc(sql`coalesce(${opportunities.overallScore}, ${opportunities.fitScore}, -1)`),
       desc(opportunities.createdAt),
     ],
-    limit: 100,
+    limit: 150,
   });
-  const sourceCounts = await db
-    .select({ source: opportunities.source, n: sql<number>`count(*)::int` })
-    .from(opportunities)
-    .where(openStages)
-    .groupBy(opportunities.source);
-  const countFor = (f: (typeof sourceFilters)[number]) =>
-    sourceCounts
-      .filter((r) =>
-        f.sources.length ? f.sources.includes(r.source ?? "") : !knownSources.includes(r.source ?? "")
-      )
-      .reduce((sum, r) => sum + r.n, 0);
-  const totalCount = sourceCounts.reduce((sum, r) => sum + r.n, 0);
 
-  const projectIds = rows.map((r) => r.projectId).filter((id): id is string => !!id);
-  const projectRows = projectIds.length
-    ? await db.query.projects.findMany({ where: inArray(projects.id, projectIds) })
-    : [];
-  const projectById = new Map(projectRows.map((p) => [p.id, p]));
+  const [rolloutCount, oneOffCount, bidCount] = await Promise.all([
+    db.$count(opportunities, and(eq(opportunities.stage, "discovered"), isRollout)!),
+    db.$count(opportunities, and(eq(opportunities.stage, "discovered"), isOneOff)!),
+    db.$count(opportunities, eq(opportunities.stage, "bid_invited")),
+  ]);
+  const counts: Record<string, number> = {
+    rollouts: rolloutCount,
+    oneoffs: oneOffCount,
+    bids: bidCount,
+  };
 
+  // One-line context per row: the radar's "why this matters" as a tooltip.
   const oppIds = rows.map((r) => r.id);
-  const evidenceRows = oppIds.length
+  const whyRows = oppIds.length
     ? await db.query.evidence.findMany({
         where: and(
           eq(evidence.entityType, "opportunity"),
-          inArray(evidence.fieldName, ["why_this_matters", "origin_signal"]),
+          eq(evidence.fieldName, "why_this_matters"),
           inArray(evidence.entityId, oppIds)
         ),
         orderBy: desc(evidence.retrievedAt),
       })
     : [];
   const whyByOpp = new Map<string, string>();
-  const signalByOpp = new Map<string, string>();
-  for (const row of evidenceRows) {
-    const target = row.fieldName === "why_this_matters" ? whyByOpp : signalByOpp;
-    if (!target.has(row.entityId)) target.set(row.entityId, String(row.value ?? ""));
-  }
-
-  // Best-known person to talk to, per account (research/swarm fill these in).
-  const accountIds = [...new Set(rows.map((r) => r.accountId).filter((id): id is string => !!id))];
-  const contactRows = accountIds.length
-    ? await db.query.contacts.findMany({ where: inArray(contacts.accountId, accountIds) })
-    : [];
-  const contactByAccount = new Map<string, (typeof contactRows)[number]>();
-  for (const c of contactRows) {
-    if (c.accountId && !contactByAccount.has(c.accountId)) contactByAccount.set(c.accountId, c);
+  for (const row of whyRows) {
+    if (!whyByOpp.has(row.entityId)) whyByOpp.set(row.entityId, String(row.value ?? ""));
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-5xl space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Opportunities</h1>
         <form action={pullTdlrAction}>
@@ -161,202 +115,137 @@ export default async function OpportunitiesPage({
       </div>
 
       <div className="rounded-lg border border-fog bg-cloud px-4 py-3 text-sm text-ink-700">
-        <span className="font-semibold">How this works:</span> refreshed automatically every
-        morning (~7am) from TDLR construction filings (39 counties, ~150 mi around Houston),
-        Houston certificates of occupancy, a web scan for franchise expansions, new
-        developments, and multi-location operators, and forwarded PlanHub invites — ranked
-        best-first. <span className="font-semibold">Nothing researches by itself:</span> finding
-        is automatic, choosing is yours. <span className="font-semibold">Pursue</span> starts
-        the research (~5 min; lands in <span className="font-semibold">Researched</span>) — on
-        a bid invite the button says <span className="font-semibold">Bid this</span> and moves
-        it to the bid desk. <span className="font-semibold">Dismiss</span> clears a card for
-        good.
+        <span className="font-semibold">How this works:</span> refreshed every morning from
+        TDLR filings, Houston COs, a web scan aimed at franchise and rollout news, and
+        forwarded PlanHub invites. <span className="font-semibold">Rollouts</span> are the
+        enterprise targets — franchises, multi-unit operators, developments — and stay until
+        you decide. <span className="font-semibold">One-off projects</span> quietly archive
+        after 7 idle days (Keep holds one; a new signal resurfaces an archived card).{" "}
+        <span className="font-semibold">Pursue</span> researches a company (~5 min) and builds
+        its card in Researched. Nothing researches by itself.
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <a
-          href="/opportunities"
-          className={`rounded-full border px-3 py-1 font-medium ${!filter ? "border-signal bg-signal text-white" : "border-fog bg-white text-ink-700 hover:border-signal"}`}
-        >
-          All ({totalCount})
-        </a>
-        {sourceFilters.map((f) => (
+        {TABS.map((t) => (
           <a
-            key={f.key}
-            href={`/opportunities?source=${f.key}`}
-            className={`rounded-full border px-3 py-1 font-medium ${filter?.key === f.key ? "border-signal bg-signal text-white" : "border-fog bg-white text-ink-700 hover:border-signal"}`}
+            key={t.key}
+            href={`/opportunities?tab=${t.key}`}
+            className={`rounded-full border px-3 py-1 font-medium ${tab === t.key ? "border-signal bg-signal text-white" : "border-fog bg-white text-ink-700 hover:border-signal"}`}
           >
-            {f.label} ({countFor(f)})
+            {t.label} ({counts[t.key]})
           </a>
         ))}
       </div>
 
-
-      <div className="space-y-3">
+      <div className="overflow-hidden rounded-lg border border-fog bg-white">
         {rows.map((o) => {
-          const badge = scoreBadge(o.overallScore ?? o.fitScore);
-          const project = o.projectId ? projectById.get(o.projectId) : null;
-          const projectValue = project?.estimatedProjectValue
-            ? Number(project.estimatedProjectValue)
-            : null;
-          const why = whyByOpp.get(o.id);
-          const signal = signalByOpp.get(o.id);
-          const contact = o.accountId ? contactByAccount.get(o.accountId) : null;
-          const address = [project?.address, project?.city].filter(Boolean).join(", ");
-          const sourceLink =
-            o.sourceDetail && /^https?:\/\//.test(o.sourceDetail) ? o.sourceDetail : null;
-          const action = o.nextAction
-            ? (nextActionLabels[o.nextAction] ?? { label: o.nextAction, help: "" })
-            : null;
+          const idleMs = Date.now() - o.updatedAt.getTime();
+          const daysLeft = Math.max(0, Math.ceil((ONE_OFF_TTL_MS - idleMs) / 86400000));
+          const expiring = tab === "oneoffs" && !o.pinned && daysLeft <= 2;
+          const isBid = ["incoming_bid", "bid"].includes(o.opportunityType ?? "") || o.stage === "bid_invited";
           return (
-            <div key={o.id} className="rounded-lg border border-fog bg-white p-4">
-              <div className="flex items-start gap-4">
-                <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg font-display text-lg font-bold ${badge.cls}`}
-                  title="Relevance score (0–100)"
+            <div
+              key={o.id}
+              className="flex items-center gap-3 border-b border-cloud px-3 py-2 text-sm last:border-b-0 hover:bg-cloud/40"
+            >
+              <span className={`w-7 shrink-0 text-right tabular-nums ${scoreCls(o.overallScore ?? o.fitScore)}`}>
+                {o.overallScore ?? o.fitScore ?? "—"}
+              </span>
+              <span
+                className="min-w-0 flex-1 truncate"
+                title={whyByOpp.get(o.id) || o.nextAction || undefined}
+              >
+                {o.pinned && (
+                  <span className="mr-1 text-[10px] uppercase tracking-wide text-signal" title="Kept — never archives">
+                    kept
+                  </span>
+                )}
+                {o.name}
+                {o.sourceDetail && (
+                  <a
+                    href={o.sourceDetail}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 text-xs text-steel underline decoration-dotted hover:text-signal"
+                  >
+                    source
+                  </a>
+                )}
+              </span>
+              <span className="hidden w-40 shrink-0 text-right text-xs text-steel sm:block">
+                {sourceShort[o.source ?? ""] ?? o.source ?? "—"} · {daysAgo(o.createdAt)}
+              </span>
+              {expiring && (
+                <span className="shrink-0 text-xs text-amber-700" title="One-off cards untouched for 7 days archive automatically">
+                  archives in {daysLeft === 0 ? "<1" : daysLeft}d
+                </span>
+              )}
+              {expiring && (
+                <form action={pinOpportunityAction} className="shrink-0">
+                  <input type="hidden" name="opportunityId" value={o.id} />
+                  <SubmitButton className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-ink-700 hover:border-signal">
+                    Keep
+                  </SubmitButton>
+                </form>
+              )}
+              <form action={pursueOpportunityAction} className="shrink-0">
+                <input type="hidden" name="opportunityId" value={o.id} />
+                <SubmitButton
+                  className="rounded bg-signal px-2.5 py-1 text-xs font-medium text-white hover:bg-signal-600"
+                  title={
+                    isBid
+                      ? "We're bidding this — moves it to the bid desk in Researched"
+                      : "Research this company (~5 min) — builds its card in Researched"
+                  }
                 >
-                  {badge.label}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold leading-snug">{o.name}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-steel">
-                    {o.opportunityType && (
-                      <span className="max-w-56 truncate rounded bg-cloud px-1.5 py-0.5" title={o.opportunityType}>
-                        {o.opportunityType}
-                      </span>
-                    )}
-                    <span className="uppercase tracking-wide">{o.stage}</span>
-                    {projectValue != null && (
-                      <span className="font-medium text-ink-700">
-                        project ~${projectValue.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-steel">
-                    {address && <span title="Project address">📍 {address}</span>}
-                    <span title="Where this came from">
-                      Found via {sourceLabels[o.source ?? ""] ?? o.source ?? "unknown"}
-                      {o.createdAt && ` on ${o.createdAt.toISOString().slice(0, 10)}`}
-                      {sourceLink && (
-                        <>
-                          {" · "}
-                          <a href={sourceLink} target="_blank" className="underline hover:text-signal">
-                            view source
-                          </a>
-                        </>
-                      )}
-                    </span>
-                    {contact ? (
-                      <span title="Best known contact (found by research)">
-                        👤 {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-                        {contact.title ? `, ${contact.title}` : ""}
-                        {contact.email ? ` · ${contact.email}` : ""}
-                      </span>
-                    ) : (
-                      <span className="text-steel/70" title="Research and Pursue find the decision-makers">
-                        👤 no contact yet — Pursue finds one
-                      </span>
-                    )}
-                  </div>
-                  {why && <p className="mt-2 text-sm text-ink-700">{why}</p>}
-                  {signal && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-steel hover:text-signal">
-                        View the original signal
-                      </summary>
-                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-cloud p-2 font-sans text-xs text-ink-700">
-                        {signal}
-                      </pre>
-                    </details>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  {["discovered", "bid_invited"].includes(o.stage) && (
-                    <form action={pursueOpportunityAction}>
-                      <input type="hidden" name="opportunityId" value={o.id} />
-                      <SubmitButton
-                        className="rounded bg-signal px-3 py-1.5 text-xs font-medium text-white hover:bg-signal-600"
-                        title={
-                          ["incoming_bid", "bid"].includes(o.opportunityType ?? "")
-                            ? "We're bidding this — moves it to the bid desk in Researched"
-                            : "Research this: owner/GC, contacts, fit (~5 min) — lands in Researched"
-                        }
-                      >
-                        {["incoming_bid", "bid"].includes(o.opportunityType ?? "")
-                          ? "Bid this"
-                          : "Pursue"}
-                      </SubmitButton>
-                    </form>
-                  )}
-                  {action && (
-                    <div
-                      className="max-w-40 cursor-help text-right text-xs text-steel underline decoration-dotted underline-offset-2"
-                      title={action.help}
-                    >
-                      {action.label}
-                    </div>
-                  )}
-                  {!["won", "lost", "dismissed"].includes(o.stage) && (
-                    <div className="flex gap-1.5">
-                      <form action={setOpportunityStageAction}>
-                        <input type="hidden" name="opportunityId" value={o.id} />
-                        <input type="hidden" name="stage" value="won" />
-                        <SubmitButton
-                          className="rounded border border-emerald-200 bg-white px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
-                          title="We already won this work — mark it and celebrate"
-                        >
-                          We won this
-                        </SubmitButton>
-                      </form>
-                      <form action={setOpportunityStageAction} className="flex items-center gap-1">
-                        <input type="hidden" name="opportunityId" value={o.id} />
-                        <input type="hidden" name="stage" value="dismissed" />
-                        <select
-                          name="dismissReason"
-                          required
-                          defaultValue=""
-                          // w-32 caps the CLOSED width — a select's intrinsic width is its
-                          // longest option, and one long reason label crushed every card's
-                          // name column to a sliver (2026-09-20). The open dropdown still
-                          // shows full labels.
-                          className="w-32 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
-                          title="Required — every dismissal teaches the radar what to score lower"
-                        >
-                          <option value="" disabled>
-                            Why dismiss?
-                          </option>
-                          {DISMISS_REASONS.map(([code, label]) => (
-                            <option key={code} value={code}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          name="dismissNote"
-                          placeholder="Note (required if Other)"
-                          className="w-32 rounded border border-fog px-1.5 py-0.5 text-[11px]"
-                        />
-                        <SubmitButton
-                          className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
-                          title="Not relevant — remove from the working list (reason required; picking Other needs the note)"
-                        >
-                          Dismiss
-                        </SubmitButton>
-                      </form>
-                    </div>
-                  )}
-                </div>
-              </div>
+                  {isBid ? "Bid this" : "Pursue"}
+                </SubmitButton>
+              </form>
+              <form action={setOpportunityStageAction} className="flex shrink-0 items-center gap-1">
+                <input type="hidden" name="opportunityId" value={o.id} />
+                <input type="hidden" name="stage" value="dismissed" />
+                <select
+                  name="dismissReason"
+                  required
+                  defaultValue=""
+                  className="w-28 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
+                  title="Required — every dismissal teaches the radar what to score lower"
+                >
+                  <option value="" disabled>
+                    Why dismiss?
+                  </option>
+                  {DISMISS_REASONS.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="dismissNote"
+                  placeholder="Note"
+                  className="hidden w-24 rounded border border-fog px-1.5 py-0.5 text-[11px] md:block"
+                  title="Required if the reason is Other"
+                />
+                <SubmitButton
+                  className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
+                  title="Not relevant — reason required; picking Other needs the note"
+                >
+                  Dismiss
+                </SubmitButton>
+              </form>
             </div>
           );
         })}
+        {rows.length === 0 && (
+          <p className="px-4 py-6 text-sm text-steel">
+            {tab === "rollouts"
+              ? "No rollout targets right now — the morning scan hunts franchise and multi-unit news daily."
+              : tab === "bids"
+                ? "No open bid invites."
+                : "No one-off projects waiting."}
+          </p>
+        )}
       </div>
-      {rows.length === 0 && (
-        <p className="text-sm text-steel">
-          Nothing waiting for triage. New finds arrive with the morning pull (~7am) and
-          forwarded PlanHub invites.
-        </p>
-      )}
     </div>
   );
 }

@@ -20,9 +20,12 @@ export const SCOUT_THEMES: { key: string; query: string }[] = [
       "Franchise brands announcing Texas expansion or development agreements in the last 30 days: new market entry, multi-unit deals, first Texas locations. Restaurant, fitness, health, retail, car wash brands.",
   },
   {
+    // Re-aimed 2026-09-21 (Rameel: the portal hunts ENTERPRISE contracts, not
+    // single grand openings): chains and operators committing to MULTIPLE
+    // Houston sites, not one-off store news.
     key: "houston_openings",
     query:
-      "Restaurant, retail, and fitness chains announcing new Houston-area locations in the last 30 days — openings planned, leases signed, construction starting.",
+      "Chains, franchises, and multi-location operators committing to MULTIPLE Houston-area locations in the last 30 days: area development agreements, market-entry announcements naming several planned sites, operators signing multiple leases. Skip single-location grand openings of independent businesses.",
   },
   {
     key: "developments",
@@ -42,7 +45,7 @@ export const SCOUT_THEMES: { key: string; query: string }[] = [
   {
     key: "houston_corridors",
     query:
-      "Commercial construction and tenant announcements in Houston growth corridors (Katy, Richmond, Cypress, Conroe, Baytown, Pearland) in the last 30 days.",
+      "New retail centers, mixed-use projects, and anchor-tenant commitments in Houston growth corridors (Katy, Richmond, Cypress, Conroe, Baytown, Pearland) in the last 30 days — developments with multiple tenant spaces, named developers, or brands taking several sites. Skip individual small-business openings.",
   },
 ];
 
@@ -99,7 +102,10 @@ export async function runExpansionScout(db: Db, opts: ScoutOptions = {}) {
     });
     const extraction = await llm.generateStructured({
       system:
-        "Extract concrete expansion discoveries from the research. Only companies the research " +
+        "Extract concrete expansion discoveries from the research. The owner hunts ENTERPRISE " +
+        "relationships: franchise deals, multi-unit commitments, developments, system rebrands. " +
+        "SKIP single-location independent openings — one boutique opening one store is not a " +
+        "discovery. Only companies the research " +
         "actually names with a real expansion signal; status verified (explicit with source), " +
         "inferred (strongly implied), or assumed (weak — will be discarded). Never invent " +
         "companies or figures.",

@@ -76,7 +76,11 @@ export async function composeReadableBrief(raw: AccountResearchBrief): Promise<R
       "whats_happening: 2-5 bullets, each ONE complete sentence about current activity. " +
       "opportunity: 1-3 sentences on what sign/awning/canopy work is plausibly in play for " +
       "HSC (channel letters, monuments, storefront, wayfinding, awnings). how_to_approach: " +
-      "1-2 concrete sentences (who to contact, with what angle). unknowns: short plain items.",
+      "2-4 plain sentences a human says out loud, NAMES FIRST: who to email first and why " +
+      "THEY are the decision-maker, the single ask in plain words, and the backup person. " +
+      "NEVER a numbered plan, never ops jargon ('monitored outreach', 'procurement splits', " +
+      "'capability package'), never registry-monitoring instructions — the owner wants to " +
+      "know who to email and what to say, nothing else. unknowns: short plain items.",
     prompt: `RAW RESEARCH MATERIAL:\n\n${rawBriefAsText(raw)}\n\nWrite the brief.`,
     schema: readableBriefSchema,
     effort: "medium",

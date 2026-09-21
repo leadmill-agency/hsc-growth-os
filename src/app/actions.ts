@@ -553,6 +553,30 @@ export async function writeEmailAction(formData: FormData) {
   revalidatePath("/researched");
 }
 
+// Keep button on expiring one-off rows (Rameel 2026-09-21): pins the card so
+// the 7-day archive sweep never touches it — his correction lever for scale
+// misclassifications.
+export async function pinOpportunityAction(formData: FormData) {
+  const opportunityId = String(formData.get("opportunityId") ?? "");
+  if (!opportunityId) return;
+  const db = await getDb();
+  const { opportunities } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db
+    .update(opportunities)
+    .set({ pinned: true, updatedAt: new Date() })
+    .where(eq(opportunities.id, opportunityId));
+  const { logActivity } = await import("@/lib/events");
+  await logActivity(db, {
+    entityType: "opportunity",
+    entityId: opportunityId,
+    action: "opportunity.kept",
+    detail: "Kept by owner — exempt from auto-archive",
+    actor: "user",
+  });
+  revalidatePath("/opportunities");
+}
+
 // Manual stage control on opportunity cards (per Rameel 2026-09-10: "we
 // actually already won the flying biscuit cafe"). Won/lost/dismissed are
 // terminal; the card reflects reality even when the deal closed offline.

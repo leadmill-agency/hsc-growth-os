@@ -18,6 +18,7 @@ export const harveySignalParse = {
   estimated_construction_value_usd: null,
   estimated_relevance_score: 84,
   national_chain: false,
+  scale: "one_off" as const,
   why_this_matters:
     "Named GC actively bidding a Houston institutional project with explicit signage/wayfinding scope and a known due date.",
   suggested_ploybook: "pb01_gc_pursuit",
