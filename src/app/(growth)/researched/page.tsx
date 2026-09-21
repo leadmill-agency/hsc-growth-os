@@ -16,6 +16,7 @@ import {
   launchAccountPloybookAction,
   resolveApprovalAction,
   setOpportunityStageAction,
+  addContactEmailAction,
 } from "@/app/actions";
 import { EmailApprovalCard, SwarmApprovalCard } from "./email-card";
 import { BidDesk } from "./bid-desk";
@@ -360,7 +361,7 @@ export default async function ResearchedPage({
                                 {c.email ? (
                                   <span className="text-emerald-700"> · email found</span>
                                 ) : (
-                                  <span className="text-amber-700"> · no email yet</span>
+                                  <span className="text-amber-700"> · no email found</span>
                                 )}
                                 {c.linkedinUrl && (
                                   <a href={c.linkedinUrl} target="_blank" className="ml-1 underline hover:text-signal">
@@ -368,6 +369,24 @@ export default async function ResearchedPage({
                                   </a>
                                 )}
                               </div>
+                              {!c.email && (
+                                <form action={addContactEmailAction} className="mt-1 flex items-center gap-1">
+                                  <input type="hidden" name="contactId" value={c.id} />
+                                  <input type="hidden" name="opportunityId" value={o.id} />
+                                  <input
+                                    name="email"
+                                    type="email"
+                                    placeholder="paste email"
+                                    className="w-32 rounded border border-fog px-1.5 py-0.5 text-[11px]"
+                                  />
+                                  <SubmitButton
+                                    className="rounded border border-fog bg-white px-1.5 py-0.5 text-[11px] font-medium text-ink-700 hover:border-signal"
+                                    title="Save the address and draft the email"
+                                  >
+                                    Draft
+                                  </SubmitButton>
+                                </form>
+                              )}
                             </div>
                           </div>
                         ))}

@@ -89,6 +89,7 @@ export async function resolveApprovalAction(formData: FormData) {
       const { and, eq } = await import("drizzle-orm");
       const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
       if (approval?.approvalType === "swarm_outreach") {
+        const skippedNoAddress: string[] = [];
         const payload = (approval.payload ?? {}) as {
           plan?: { sequencing_rationale?: string };
           messages?: { contact_name: string; subject: string; body: string; day_offset: number }[];
@@ -127,29 +128,30 @@ export async function resolveApprovalAction(formData: FormData) {
             target_contact: m.contact_name,
             day_offset: m.day_offset,
           };
+          // ADDRESS FIRST (Rameel 2026-09-21): a swarm message to someone we
+          // can't reach never becomes an Outbox card — it's skipped and named
+          // in an activity instead.
+          let foundEmail: { email: string; confidence: number; source: string } | null = null;
           try {
             const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
-            const found = await findWorkEmail({
+            foundEmail = await findWorkEmail({
               fullName: m.contact_name,
               domain,
               company: accountName || undefined,
             });
-            draft = found
-              ? {
-                  ...draft,
-                  suggested_email: found.email,
-                  suggested_email_confidence: found.confidence,
-                  suggested_email_source: found.source,
-                }
-              : {
-                  ...draft,
-                  suggested_email_note: domain
-                    ? `Hunter has no email for ${m.contact_name} at ${domain} — try LinkedIn.`
-                    : `No website on file for ${accountName || "this company"} — add it on the account and use Find email.`,
-                };
           } catch {
-            // enrichment is best-effort
+            // finder is best-effort
           }
+          if (!foundEmail) {
+            skippedNoAddress.push(m.contact_name);
+            continue;
+          }
+          draft = {
+            ...draft,
+            suggested_email: foundEmail.email,
+            suggested_email_confidence: foundEmail.confidence,
+            suggested_email_source: foundEmail.source,
+          };
           await createApproval(db, {
             approvalType: "send_outreach",
             title: `Send outreach: ${accountName || "swarm"} — ${m.contact_name} (Day ${m.day_offset})`,
@@ -157,6 +159,16 @@ export async function resolveApprovalAction(formData: FormData) {
             proposedAction:
               "Part of the approved swarm sequence. Edit freely; approving with a verified email sends it as Ray on this message's day.",
             payload: { draft, accountId },
+          });
+        }
+        if (skippedNoAddress.length) {
+          const { logActivity } = await import("@/lib/events");
+          await logActivity(db, {
+            entityType: "approval",
+            entityId: approvalId,
+            action: "swarm.skipped_no_address",
+            detail: `Swarm skipped ${skippedNoAddress.length} without an address: ${skippedNoAddress.join(", ")} — add emails on the company card to include them`,
+            actor: "system",
           });
         }
         revalidatePath("/researched");
@@ -506,51 +518,130 @@ export async function writeEmailAction(formData: FormData) {
     };
   }
 
+  // ADDRESS FIRST (Rameel 2026-09-21: "if you don't have an email, why are
+  // you generating emails"): resolve a sendable address BEFORE any drafting.
+  // Stored contact emails win; otherwise Apollo→Hunter across up to four
+  // candidates. No address → no draft — a visible note on the company card
+  // asks for one instead of a dead email sitting in the Outbox.
+  const allContacts = await db.query.contacts.findMany({
+    where: eq(contacts.accountId, account.id),
+    orderBy: desc(contacts.influenceScore),
+    limit: 6,
+  });
+  type Candidate = { name: string; title?: string | null; email?: string | null; contactId?: string };
+  const candidates: Candidate[] = [];
+  for (const c of allContacts) {
+    const nm = [c.firstName, c.lastName].filter(Boolean).join(" ");
+    if (nm) candidates.push({ name: nm, title: c.title, email: c.email, contactId: c.id });
+  }
+  for (const p of ((stakeholders?.people ?? []) as { name?: string; title?: string | null }[])) {
+    if (p.name && !candidates.some((c) => c.name.toLowerCase() === p.name!.toLowerCase())) {
+      candidates.push({ name: p.name, title: p.title });
+    }
+  }
+  const domain =
+    account.domain ??
+    account.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  let target: Candidate | null = null;
+  let foundEmail: { email: string; confidence: number; source: string } | null = null;
+  const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
+  for (const cand of candidates.slice(0, 4)) {
+    if (cand.email) {
+      target = cand;
+      foundEmail = { email: cand.email, confidence: 95, source: "stored" };
+      break;
+    }
+    try {
+      const f = await findWorkEmail({ fullName: cand.name, domain: domain ?? undefined, company: account.name });
+      if (f) {
+        target = cand;
+        foundEmail = f;
+        if (cand.contactId) {
+          await db.update(contacts).set({ email: f.email }).where(eq(contacts.id, cand.contactId));
+        }
+        break;
+      }
+    } catch {
+      // finder is best-effort; keep trying the next candidate
+    }
+  }
+
+  if (!target || !foundEmail) {
+    const { logActivity } = await import("@/lib/events");
+    const tried = candidates.slice(0, 4).map((c) => c.name).join(", ");
+    await logActivity(db, {
+      entityType: "opportunity",
+      entityId: opportunityId,
+      action: "outreach.no_address",
+      detail: tried
+        ? `${account.name} — no email found for ${tried} (Apollo + Hunter). Paste an address on the company card to draft.`
+        : `${account.name} — no named contacts to look up. Run Research, or add a contact with an email.`,
+      actor: "system",
+    });
+    revalidatePath("/researched");
+    return;
+  }
+
+  // Draft aimed at the person we can actually reach.
   const { draftOutreach } = await import("@/lib/actions/outreach");
   const draft = (await draftOutreach({
     accountName: account.name,
     projectName: opp.name,
     brief: brief as never,
-    stakeholders: stakeholders as never,
-  })) as Record<string, unknown> & { target_contact?: string };
-
-  // Hunter enrichment — pre-fill the send field when we can.
-  let enriched: Record<string, unknown> = draft;
-  try {
-    const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
-    const domain =
-      account.domain ??
-      account.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-    const fullName = draft.target_contact?.split(",")[0]?.trim();
-    const found = fullName
-      ? await findWorkEmail({ fullName, domain: domain ?? undefined, company: account.name })
-      : null;
-    enriched = found
-      ? {
-          ...draft,
-          suggested_email: found.email,
-          suggested_email_confidence: found.confidence,
-          suggested_email_source: found.source,
-        }
-      : {
-          ...draft,
-          suggested_email_note: domain
-            ? `Hunter has no email for ${fullName ?? "this contact"} at ${domain} — try LinkedIn.`
-            : `No website on file for ${account.name} — add it on the account page and retry.`,
-        };
-  } catch {
-    // enrichment is best-effort
-  }
+    stakeholders: {
+      people: [
+        {
+          name: target.name,
+          title: target.title ?? "",
+          role_type: "unknown",
+          why_relevant: target.title ?? "reachable contact",
+          status: "inferred",
+        },
+      ],
+    } as never,
+  })) as Record<string, unknown>;
+  const enriched: Record<string, unknown> = {
+    ...draft,
+    target_contact: `${target.name}${target.title ? `, ${target.title}` : ""}`,
+    suggested_email: foundEmail.email,
+    suggested_email_confidence: foundEmail.confidence,
+    suggested_email_source: foundEmail.source,
+  };
 
   const { createApproval } = await import("@/lib/ploybooks/runner");
   await createApproval(db, {
     approvalType: "send_outreach",
     title: `Send outreach: ${account.name}`,
-    summary: `Drafted on request from the Researched tab for ${opp.name}.`,
-    proposedAction: "Review/edit the draft; approving with an email sends it as Ray.",
-    payload: { draft: enriched, opportunityId },
+    summary: `To ${target.name} (${foundEmail.email}) — drafted from the Researched tab for ${opp.name}.`,
+    proposedAction: "Review/edit the draft; approving sends it as Ray.",
+    payload: { draft: enriched, opportunityId, accountId: account.id },
   });
   revalidatePath("/researched");
+}
+
+// Paste-an-email path for a contact the finders couldn't reach (Rameel
+// 2026-09-21): saves the address on the contact, then drafts through the
+// same address-first flow.
+export async function addContactEmailAction(formData: FormData) {
+  const contactId = String(formData.get("contactId") ?? "");
+  const opportunityId = String(formData.get("opportunityId") ?? "");
+  const email = String(formData.get("email") ?? "").trim();
+  if (!contactId || !opportunityId || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
+  const db = await getDb();
+  const { contacts } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db.update(contacts).set({ email }).where(eq(contacts.id, contactId));
+  const { logActivity } = await import("@/lib/events");
+  await logActivity(db, {
+    entityType: "contact",
+    entityId: contactId,
+    action: "contact.email_added",
+    detail: `Email added by owner: ${email}`,
+    actor: "user",
+  });
+  const fd = new FormData();
+  fd.set("opportunityId", opportunityId);
+  await writeEmailAction(fd);
 }
 
 // Keep button on expiring one-off rows (Rameel 2026-09-21): pins the card so
