@@ -410,7 +410,34 @@ export async function pursueOpportunityAction(formData: FormData) {
     triggerType: "manual",
     initiatedBy: "user",
   });
-  if (result.runId) executeInBackground(db, result.runId);
+  // Stagger parallel Pursues (Rameel 2026-09-21): four at once saturated
+  // OpenAI's token-per-minute window and killed all four runs. If research is
+  // already executing, the new run stays queued — the minute tick starts
+  // queued runs one per minute, so rapid clicks turn into a 1/min drip.
+  if (result.runId) {
+    const { ploybookRuns } = await import("@/lib/db/schema");
+    const { and, eq, ne, gte } = await import("drizzle-orm");
+    const running = await db.query.ploybookRuns.findMany({
+      where: and(
+        eq(ploybookRuns.status, "running"),
+        ne(ploybookRuns.id, result.runId),
+        gte(ploybookRuns.updatedAt, new Date(Date.now() - 10 * 60 * 1000))
+      ),
+      limit: 1,
+    });
+    if (running.length === 0) {
+      executeInBackground(db, result.runId);
+    } else {
+      const { logActivity } = await import("@/lib/events");
+      await logActivity(db, {
+        entityType: "opportunity",
+        entityId: opportunityId,
+        action: "pursuit.queued",
+        detail: "Research queued — another run is in flight; starts within a minute of its slot",
+        actor: "system",
+      });
+    }
+  }
   revalidatePath("/opportunities");
   revalidatePath("/ploybooks");
   revalidatePath("/researched");

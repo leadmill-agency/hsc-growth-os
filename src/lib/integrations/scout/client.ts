@@ -14,38 +14,27 @@ import { and, eq, gte } from "drizzle-orm";
 // finds are cheap no-ops thanks to entity dedupe.
 
 export const SCOUT_THEMES: { key: string; query: string }[] = [
+  // Slimmed 6 → 4 themes (Rameel 2026-09-21: cost) — the two cut themes'
+  // coverage is folded into these, and each theme runs a minute apart.
   {
     key: "franchise_tx",
     query:
       "Franchise brands announcing Texas expansion or development agreements in the last 30 days: new market entry, multi-unit deals, first Texas locations. Restaurant, fitness, health, retail, car wash brands.",
   },
   {
-    // Re-aimed 2026-09-21 (Rameel: the portal hunts ENTERPRISE contracts, not
-    // single grand openings): chains and operators committing to MULTIPLE
-    // Houston sites, not one-off store news.
-    key: "houston_openings",
+    key: "multi_location_operators",
     query:
-      "Chains, franchises, and multi-location operators committing to MULTIPLE Houston-area locations in the last 30 days: area development agreements, market-entry announcements naming several planned sites, operators signing multiple leases. Skip single-location grand openings of independent businesses.",
+      "Chains and multi-location operators committing to MULTIPLE Texas or Houston-area locations in the last 30 days: urgent care, dental groups, gyms, car washes, gas stations, restaurants — area development agreements, several signed leases, market-entry announcements naming multiple sites. Skip single-location grand openings of independent businesses.",
   },
   {
     key: "developments",
     query:
-      "New commercial developments announced or breaking ground in Greater Houston in the last 30 days: retail centers, mixed-use, medical, grocery-anchored projects — developer names and locations.",
+      "New commercial developments announced or breaking ground in Greater Houston and its growth corridors (Katy, Richmond, Cypress, Conroe, Baytown, Pearland) in the last 30 days: retail centers, mixed-use, medical, grocery-anchored projects — developer names, anchor tenants, locations. Skip individual small-business openings.",
   },
   {
     key: "rebrands_acquisitions",
     query:
       "Acquisitions or rebrands affecting Texas multi-location businesses in the last 30 days: chains acquired and being renamed, banner conversions, healthcare or retail rebrand programs.",
-  },
-  {
-    key: "multi_location_operators",
-    query:
-      "Multi-location operators expanding in Texas in the last 30 days: urgent care, dental groups, gyms, car washes, gas stations adding Texas or Houston sites.",
-  },
-  {
-    key: "houston_corridors",
-    query:
-      "New retail centers, mixed-use projects, and anchor-tenant commitments in Houston growth corridors (Katy, Richmond, Cypress, Conroe, Baytown, Pearland) in the last 30 days — developments with multiple tenant spaces, named developers, or brands taking several sites. Skip individual small-business openings.",
   },
 ];
 
@@ -94,7 +83,13 @@ export async function runExpansionScout(db: Db, opts: ScoutOptions = {}) {
 
   const results: { company: string; status: string }[] = [];
   let fed = 0;
+  let themeIndex = 0;
   for (const theme of themes) {
+    // A minute between theme queries (Rameel 2026-09-21) keeps the morning
+    // burst under OpenAI's tokens-per-minute ceiling. Skipped under tests.
+    if (themeIndex++ > 0 && !process.env.VITEST) {
+      await new Promise((r) => setTimeout(r, 60_000));
+    }
     const research = await provider.research({
       query: theme.query,
       focus:

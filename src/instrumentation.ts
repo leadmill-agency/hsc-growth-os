@@ -188,6 +188,17 @@ export async function register() {
       const { processSendQueue } = await import("@/lib/outbound/send-queue");
       const sent = await processSendQueue(db);
       if (sent) console.log(`[send-queue] delivered ${sent} queued email(s)`);
+      // Queued runs start ONE per minute (Rameel 2026-09-21): rapid Pursues
+      // become a 1/min drip instead of a parallel burst that trips OpenAI's
+      // token-per-minute ceiling. Also speeds up PB10 child-run pickup.
+      const { resumeOrphanedRuns } = await import("@/lib/ploybooks/runner");
+      await import("@/lib/ploybooks");
+      const started = await resumeOrphanedRuns(db, {
+        runningOlderThanMs: 15 * 60 * 1000,
+        queuedOlderThanMs: 30 * 1000,
+        limit: 1,
+      });
+      if (started) console.log(`[run-queue] started 1 queued run`);
     } catch (err) {
       console.error("[send-queue] tick failed:", err);
     }
