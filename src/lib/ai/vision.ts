@@ -34,7 +34,7 @@ export async function generateStructuredFromPdf<S extends z.ZodType>(
     throw new Error("PDF vision requires OPENAI_API_KEY (tests: setVisionForTests())");
   }
   const OpenAI = (await import("openai")).default;
-  const client = new OpenAI();
+  const client = new OpenAI({ maxRetries: 6 });
   const jsonSchema = z.toJSONSchema(params.schema);
   const response = await client.responses.create({
     model: process.env.OPENAI_VISION_MODEL ?? "gpt-5-mini",

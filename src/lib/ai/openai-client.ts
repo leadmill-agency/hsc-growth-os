@@ -10,7 +10,11 @@ export class OpenAILLMClient implements LLMClient {
 
   private async getClient() {
     if (!this.clientPromise) {
-      this.clientPromise = import("openai").then((m) => new m.default());
+      this.clientPromise = import("openai").then(
+        // maxRetries 6: a TPM-window 429 (4 parallel pursuits, 2026-09-21)
+        // needs ~a minute of retry-after-honoring backoff, not the default 2.
+        (m) => new m.default({ maxRetries: 6 })
+      );
     }
     return this.clientPromise;
   }

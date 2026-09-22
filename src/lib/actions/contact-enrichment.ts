@@ -2,6 +2,7 @@ import type { Db } from "@/lib/db/client";
 import { accounts, contacts, opportunities } from "@/lib/db/schema";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { logActivity } from "@/lib/events";
+import { accountNameStems } from "@/lib/actions/entities";
 
 // Proactive contact enrichment (Rameel 2026-09-21: Stretch Zone's targets sat
 // as "no email found" when Apollo had 5 of 7 on the first try — nobody had
@@ -9,6 +10,33 @@ import { logActivity } from "@/lib/events";
 // an Apollo→Hunter lookup, a few per tick to respect rate limits. Each contact
 // is looked up ONCE (emailLookupAt marks the attempt) — the paste-email field
 // and the Find email button remain the manual paths afterward.
+
+/** Is this found email really at THIS company? Website and mail domains often
+ *  differ (twinpeaksrestaurant.com site, tprest.com mail), so Apollo's org
+ *  match outranks the domain comparison, and a mail domain other contacts at
+ *  the account already use is trusted. */
+export function emailBelongsToCompany(
+  account: { name: string; domain?: string | null },
+  found: { email: string; orgName?: string | null; orgDomain?: string | null },
+  knownMailDomains: Set<string>
+): boolean {
+  const mailDomain = found.email.toLowerCase().split("@")[1] ?? "";
+  if (account.domain && mailDomain === account.domain.toLowerCase()) return true;
+  if (knownMailDomains.has(mailDomain)) return true;
+  if (found.orgDomain && account.domain && found.orgDomain.toLowerCase() === account.domain.toLowerCase())
+    return true;
+  if (found.orgName) {
+    const a = accountNameStems(account.name);
+    const b = accountNameStems(found.orgName);
+    if (a.size >= 1 && b.size >= 1) {
+      const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+      if ([...small].every((s) => big.has(s))) return true;
+    }
+    return false; // Apollo names a DIFFERENT company — the person moved on
+  }
+  // No org info from the provider: trust only a matching/known mail domain.
+  return false;
+}
 
 export async function enrichResearchedContacts(db: Db, limit = 6): Promise<number> {
   const activeOpps = await db.query.opportunities.findMany({
@@ -60,10 +88,12 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
         const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
         void FinderQuotaError;
         const f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
-        // Guard against stale org charts: an address on a DIFFERENT domain
-        // than the company's means the person likely moved on — don't store
-        // an email that would cold-call a stranger about the wrong company.
-        if (f && (!domain || f.email.toLowerCase().endsWith(`@${domain.toLowerCase()}`))) {
+        const knownMailDomains = new Set(
+          (byAccount.get(c.accountId!) ?? [])
+            .map((k) => k.email?.toLowerCase().split("@")[1])
+            .filter((d): d is string => !!d)
+        );
+        if (f && acct && emailBelongsToCompany({ name: acct.name, domain }, f, knownMailDomains)) {
           email = f.email;
         } else if (f) {
           await logActivity(db, {
@@ -173,10 +203,17 @@ export async function discoverContactsForUncovered(db: Db, limit = 3): Promise<n
         if (!person) continue;
         const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ");
         if (existingNames.has(fullName.toLowerCase())) continue;
-        // Moved-on guard: an email on a different domain than the company's
-        // means Apollo's org data is stale — store the person, not the email.
+        // Moved-on guard, org-aware: reveal-by-id has no org context in our
+        // read, but a mail domain other contacts already use is trusted.
+        const knownMailDomains = new Set(
+          (byAccount.get(acct.id) ?? [])
+            .map((k) => k.email?.toLowerCase().split("@")[1])
+            .filter((d): d is string => !!d)
+        );
+        const mailDomain = person.email?.toLowerCase().split("@")[1] ?? "";
         const emailOk =
-          person.email && (!domain || person.email.toLowerCase().endsWith(`@${domain.toLowerCase()}`));
+          person.email &&
+          (!domain || mailDomain === domain.toLowerCase() || knownMailDomains.has(mailDomain));
         await db.insert(contacts).values({
           accountId: acct.id,
           firstName: person.firstName,

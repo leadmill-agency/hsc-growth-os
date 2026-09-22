@@ -9,7 +9,7 @@ export class OpenAIResearchProvider implements ResearchProvider {
 
   private async getClient() {
     if (!this.clientPromise) {
-      this.clientPromise = import("openai").then((m) => new m.default());
+      this.clientPromise = import("openai").then((m) => new m.default({ maxRetries: 6 }));
     }
     return this.clientPromise;
   }

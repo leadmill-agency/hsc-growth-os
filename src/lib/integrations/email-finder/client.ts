@@ -8,6 +8,12 @@ export interface FoundEmail {
   /** Provider confidence 0-100. Below ~80, verify before sending. */
   confidence: number;
   source: string;
+  /** The company Apollo says this person is CURRENTLY at (when returned) —
+   *  the right way to judge moved-on, since mail domains often differ from
+   *  website domains (Twin Peaks: twinpeaksrestaurant.com site, tprest.com
+   *  email — 2026-09-21). */
+  orgName?: string | null;
+  orgDomain?: string | null;
 }
 
 export interface FindEmailParams {
@@ -57,12 +63,22 @@ async function findViaApollo(params: FindEmailParams): Promise<FoundEmail | null
       return null;
     }
     const json = (await res.json()) as {
-      person?: { email?: string | null; email_status?: string | null };
+      person?: {
+        email?: string | null;
+        email_status?: string | null;
+        organization?: { name?: string | null; primary_domain?: string | null } | null;
+      };
     };
     const email = json.person?.email;
     if (!email || email.includes("email_not_unlocked")) return null;
     const confidence = json.person?.email_status === "verified" ? 95 : 60;
-    return { email, confidence, source: "apollo" };
+    return {
+      email,
+      confidence,
+      source: "apollo",
+      orgName: json.person?.organization?.name ?? null,
+      orgDomain: json.person?.organization?.primary_domain ?? null,
+    };
   } catch (err) {
     if (err instanceof FinderQuotaError) throw err;
     console.warn(`[email-finder] apollo lookup failed:`, (err as Error).message);
