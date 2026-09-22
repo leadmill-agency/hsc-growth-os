@@ -206,13 +206,12 @@ export default async function OpportunitiesPage({
                 <input type="hidden" name="stage" value="dismissed" />
                 <select
                   name="dismissReason"
-                  required
                   defaultValue=""
                   className="w-28 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
-                  title="Required — every dismissal teaches the radar what to score lower"
+                  title="Optional — a reason teaches the radar what to score lower"
                 >
-                  <option value="" disabled>
-                    Why dismiss?
+                  <option value="">
+                    Why? (optional)
                   </option>
                   {DISMISS_REASONS.map(([code, label]) => (
                     <option key={code} value={code}>
@@ -228,7 +227,7 @@ export default async function OpportunitiesPage({
                 />
                 <SubmitButton
                   className="rounded border border-fog bg-white px-2 py-0.5 text-[11px] font-medium text-steel hover:border-signal"
-                  title="Not relevant — reason required; picking Other needs the note"
+                  title="Remove from the list — reason optional but appreciated"
                 >
                   Dismiss
                 </SubmitButton>

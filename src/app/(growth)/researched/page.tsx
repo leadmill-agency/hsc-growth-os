@@ -493,13 +493,12 @@ export default async function ResearchedPage({
                       <input type="hidden" name="stage" value="dismissed" />
                       <select
                         name="dismissReason"
-                        required
                         defaultValue=""
                         className="w-32 rounded border border-fog bg-white px-1 py-0.5 text-[11px] text-steel"
-                        title="Required — every dismissal teaches the radar what to score lower"
+                        title="Optional — a reason teaches the radar what to score lower"
                       >
-                        <option value="" disabled>
-                          Why dismiss?
+                        <option value="">
+                          Why? (optional)
                         </option>
                         {DISMISS_REASONS.map(([code, label]) => (
                           <option key={code} value={code}>
@@ -514,7 +513,7 @@ export default async function ResearchedPage({
                       />
                       <SubmitButton
                         className="rounded border border-fog bg-white px-2.5 py-1 text-xs font-medium text-steel hover:border-signal"
-                        title="Not interested — removes the card (reason required)"
+                        title="Not interested — removes the card (reason optional)"
                       >
                         Dismiss
                       </SubmitButton>
