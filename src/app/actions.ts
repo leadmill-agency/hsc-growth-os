@@ -180,6 +180,29 @@ export async function resolveApprovalAction(formData: FormData) {
 
   // Approve + recipient on an outreach/follow-up = actually send (guarded layer
   // still refuses unless ALLOW_EXTERNAL_SEND=true and the domain is live).
+    // Rejecting an outreach draft undoes the Write-email decision: the company
+  // card returns to the Companies queue (Rameel 2026-09-22).
+  if (decision === "rejected") {
+    try {
+      const { approvals, opportunities } = await import("@/lib/db/schema");
+      const { and, eq } = await import("drizzle-orm");
+      const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
+      const p = (approval?.payload ?? {}) as { opportunityId?: string };
+      if (
+        approval &&
+        ["send_outreach", "send_followup"].includes(approval.approvalType) &&
+        p.opportunityId
+      ) {
+        await db
+          .update(opportunities)
+          .set({ stage: "researched", nextAction: "Draft rejected — decide again", updatedAt: new Date() })
+          .where(and(eq(opportunities.id, p.opportunityId), eq(opportunities.stage, "pursuing")));
+      }
+    } catch (err) {
+      console.warn("[reject] could not return card to Companies:", (err as Error).message);
+    }
+  }
+
   if (decision === "approved" && recipientEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipientEmail)) {
     try {
       const { approvals, followups } = await import("@/lib/db/schema");
@@ -660,6 +683,18 @@ export async function writeEmailAction(formData: FormData) {
     proposedAction: "Review/edit the draft; approving sends it as Ray.",
     payload: { draft: enriched, opportunityId, accountId: account.id },
   });
+  // Companies is a DECISION queue (Rameel 2026-09-22): clicking Write email IS
+  // the decision, so the card leaves immediately — the draft lives in Outbox,
+  // the account stays browsable on /accounts. Rejecting the draft brings the
+  // card back for a re-decision.
+  await db
+    .update(opportunities)
+    .set({
+      stage: "pursuing",
+      nextAction: "Draft in Outbox — review and approve; sends 9am–5:30pm",
+      updatedAt: new Date(),
+    })
+    .where(eq(opportunities.id, opportunityId));
   revalidatePath("/researched");
 }
 
@@ -1014,9 +1049,30 @@ export async function launchAccountPloybookAction(formData: FormData) {
     initiatedBy: "user",
   });
   executeInBackground(db, runId);
+  // Launching a swarm IS the decision (Rameel 2026-09-22): the company's card
+  // leaves the Companies queue; the sequence lands in Outbox.
+  if (which === "swarm" && accountId) {
+    const { opportunities } = await import("@/lib/db/schema");
+    const { and, eq, notInArray, sql } = await import("drizzle-orm");
+    await db
+      .update(opportunities)
+      .set({
+        stage: "pursuing",
+        nextAction: "Swarm drafting — sequence lands in Outbox for review",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(opportunities.accountId, accountId),
+          eq(opportunities.stage, "researched"),
+          notInArray(sql`coalesce(${opportunities.opportunityType}, '')`, ["incoming_bid", "bid"])
+        )
+      );
+  }
   revalidatePath("/accounts");
   revalidatePath("/ploybooks");
   revalidatePath("/approvals");
+  revalidatePath("/researched");
   // Land the user somewhere that SHOWS the run started — a silent background
   // launch reads as a dead button (Rameel, 2026-09-10).
   if (accountId) {
