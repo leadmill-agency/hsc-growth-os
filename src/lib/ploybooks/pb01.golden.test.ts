@@ -138,6 +138,8 @@ describe("Harvey Golden Path", () => {
           estimated_relevance_score: 75,
           national_chain: false,
           scale: "one_off" as const,
+          greater_houston: true,
+          mentions_canopy_or_awning: false,
         }),
       })
     );

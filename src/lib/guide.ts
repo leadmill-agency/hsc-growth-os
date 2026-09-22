@@ -26,7 +26,7 @@ export const GENERAL_GUIDE = {
     "Long jobs run in the background for a few minutes. Refresh the page; Ploybooks → Recent runs shows progress.",
   ],
   scores:
-    "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't. Canopy/awning work counts statewide; signage-only work counts within ~150 miles of Houston.",
+    "Scores are 0–100 and answer one question: how likely is this to become good sign work for us? Blue 85+ means pursue now. Dark 70–84 is strong. Amber 50–69 means monitor. Below 50, ignore unless you know something the system doesn't. Everything we hunt is Greater Houston (~50 mi of downtown); canopy/awning work and inbound bids count statewide.",
   approvals:
     "Emails never send themselves. Write email puts an editable draft on the researched card — what's in the fields when you approve (with a verified recipient) is exactly what sends, as Ray. Discarding a draft keeps the research.",
 };

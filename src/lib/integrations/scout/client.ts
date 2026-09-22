@@ -19,12 +19,12 @@ export const SCOUT_THEMES: { key: string; query: string }[] = [
   {
     key: "franchise_tx",
     query:
-      "Franchise brands announcing Texas expansion or development agreements in the last 30 days: new market entry, multi-unit deals, first Texas locations. Restaurant, fitness, health, retail, car wash brands.",
+      "Franchise brands announcing GREATER HOUSTON locations or Houston-market entry in the last 30 days: development agreements, multi-unit deals, or first Houston-area locations (within ~50 miles of downtown Houston — Katy, Sugar Land, The Woodlands, Conroe, Pearland, Baytown, Galveston). Restaurant, fitness, health, retail, car wash brands. Skip Dallas, Austin, and San Antonio news unless it names a Houston-area site.",
   },
   {
     key: "multi_location_operators",
     query:
-      "Chains and multi-location operators committing to MULTIPLE Texas or Houston-area locations in the last 30 days: urgent care, dental groups, gyms, car washes, gas stations, restaurants — area development agreements, several signed leases, market-entry announcements naming multiple sites. Skip single-location grand openings of independent businesses.",
+      "Chains and multi-location operators committing to MULTIPLE Greater Houston locations (within ~50 miles of downtown Houston) in the last 30 days: urgent care, dental groups, gyms, car washes, gas stations, restaurants — area development agreements, several signed leases, market-entry announcements naming Houston-area sites. Skip single-location independent openings and skip Dallas/Austin/San Antonio-only news.",
   },
   {
     key: "developments",
@@ -34,7 +34,7 @@ export const SCOUT_THEMES: { key: string; query: string }[] = [
   {
     key: "rebrands_acquisitions",
     query:
-      "Acquisitions or rebrands affecting Texas multi-location businesses in the last 30 days: chains acquired and being renamed, banner conversions, healthcare or retail rebrand programs.",
+      "Acquisitions or rebrands hitting GREATER HOUSTON multi-location businesses in the last 30 days: chains with Houston-area stores being acquired or renamed, banner conversions, healthcare or retail rebrand programs affecting locations within ~50 miles of Houston.",
   },
 ];
 

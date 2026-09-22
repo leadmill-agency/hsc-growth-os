@@ -87,5 +87,8 @@ A PB is done only per its own Definition of Done. Phase order is master PRD §26
   check shipped a near-duplicate of an existing blog post. Manual run:
   `npx tsx scripts/run-seo-scan-now.ts`. When a draft overlaps an existing page, MERGE the
   new material into that URL; never publish a twin.
-- **Canopy/awning scope is valid STATEWIDE** and never auto-passes; signage-only is
-  ~150 mi of Houston. PB10 PASS recommendations auto-close visibly (activity + reason).
+- **Generated opportunities are GREATER HOUSTON only** (~50 mi of downtown, Rameel
+  2026-09-22): the radar skips outside-area signals, the scout hunts Houston-area news,
+  TDLR pulls 9 counties. **Canopy/awning scope stays STATEWIDE** and never auto-passes;
+  inbound bid invites are exempt from the radius. PB10 PASS recommendations auto-close
+  visibly (activity + reason).

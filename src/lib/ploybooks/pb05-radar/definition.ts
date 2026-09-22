@@ -25,6 +25,11 @@ const signalParseSchema = z.object({
   // 'rollout' = repeat-buyer at stake (franchise/multi-unit/development);
   // 'one_off' = a single project. Drives the inbox split (Rameel 2026-09-21).
   scale: z.enum(["rollout", "one_off"]),
+  // Greater Houston only (Rameel 2026-09-22): within ~50 miles of downtown.
+  // Dallas/Austin/San Antonio noise never becomes a card; canopy/awning scope
+  // keeps its statewide exception, and inbound bids are untouched.
+  greater_houston: z.boolean(),
+  mentions_canopy_or_awning: z.boolean(),
   opportunity_type: z.string().max(60), // short label, not a sentence
   estimated_construction_value_usd: z.number().nullable(), // only when the signal states it
   estimated_relevance_score: z.number().min(0).max(100),
@@ -128,6 +133,14 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "scope is stated. estimated_relevance_score is 0-100 (NOT 0-10). Calibrate against " +
             "these anchors and use the FULL range — never park everything at a safe middle " +
             "value; two different signals should almost never share a score: " +
+            "GEOGRAPHY GATE (from the owner 2026-09-22): greater_houston=true ONLY when the " +
+            "project/location sits within ~50 miles of downtown Houston — Houston proper, " +
+            "Katy, Sugar Land, The Woodlands, Conroe, Pearland, League City, Baytown, " +
+            "Galveston, Cypress, Spring, Tomball, Richmond, Rosenberg, Humble, Pasadena and " +
+            "similar. Dallas–Fort Worth, Austin, San Antonio, Waco, and anywhere farther is " +
+            "false. A statewide/multi-market signal is true only if it NAMES a Greater " +
+            "Houston site. mentions_canopy_or_awning=true when the signal's scope includes " +
+            "awnings or canopies (those are served statewide). " +
             "92 = active Houston bid invite explicitly naming signage/awning scope. " +
             "85 = an emerging brand, franchise, or multi-location operator moving in (named " +
             "tenant build-out or certificate of occupancy) — they need signs on a known " +
@@ -145,9 +158,7 @@ export const pb05OpportunityRadar: PloybookDefinition = {
             "35 = infrastructure/civil work (roads, utilities) — signage unlikely. " +
             "15 = residential or clearly sign-free scope. " +
             "Adjust within a band: up for stated dollar value, a named GC/owner, near-term " +
-            "dates; down for vague scope. GEOGRAPHY: signage-only work outside the Houston " +
-            "metro (~150 mi) scores down sharply (<50) — but awning/canopy scope is served " +
-            "STATEWIDE: score any Texas awning/canopy work on its merits, no metro penalty. " +
+            "dates; down for vague scope. " +
             "suggested_ploybook: pb01_gc_pursuit for GC/bid signals; pb02 ONLY for genuine " +
             "multi-tenant commercial developments (retail centers, mixed-use) — never schools, " +
             "civic buildings, or single-tenant projects; pb03 franchise expansion; pb04 " +
@@ -173,6 +184,19 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         }
         // Permit-style signals (e.g. TDLR) often name a facility/project but no company.
         // Anchor on the project and leave the account null — identifying the owner/GC is
+        // Greater Houston gate (Rameel 2026-09-22): outside ~50 miles nothing
+        // is created — except canopy/awning scope, which is statewide.
+        if (!parsed.greater_houston && !parsed.mentions_canopy_or_awning) {
+          await logActivity(ctx.db, {
+            entityType: "ploybook_run",
+            entityId: ctx.runId,
+            action: "radar.outside_area_skipped",
+            detail: `${parsed.company_name ?? parsed.project_name ?? "signal"} skipped — outside Greater Houston (~50 mi) and no canopy/awning scope`,
+            actor: "system",
+            ploybookRunId: ctx.runId,
+          });
+          return { kind: "completed", outputs: { skippedOutsideArea: true } };
+        }
         // Fortune-1000-scale corporate chains never become cards (Rameel
         // 2026-09-19: "we aren't big enough at scale to get those") — logged
         // to History so the decision is visible, then nothing is created.

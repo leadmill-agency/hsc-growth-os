@@ -54,6 +54,8 @@ const radarParse = {
   estimated_relevance_score: 82,
   national_chain: false,
           scale: "rollout" as const,
+          greater_houston: true,
+          mentions_canopy_or_awning: false,
   why_this_matters: "100-store Texas rollout with Houston sites in construction — repeatable signage program.",
   suggested_ploybook: "pb03",
   unknowns: [],
