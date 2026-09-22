@@ -572,6 +572,34 @@ export async function writeEmailAction(formData: FormData) {
     };
   }
 
+  // One pending draft per company (2026-09-22): retried runs + double clicks
+  // stacked duplicate drafts in the Outbox — approving both double-emails a
+  // person. An existing pending draft means the decision is already made.
+  {
+    const { approvals } = await import("@/lib/db/schema");
+    const { and: and2, eq: eq2, inArray: inArray2 } = await import("drizzle-orm");
+    const existing = (
+      await db.query.approvals.findMany({
+        where: and2(
+          eq2(approvals.status, "pending"),
+          inArray2(approvals.approvalType, ["send_outreach", "send_followup"])
+        ),
+      })
+    ).find((a) => (a.payload as { opportunityId?: string })?.opportunityId === opportunityId);
+    if (existing) {
+      await db
+        .update(opportunities)
+        .set({
+          stage: "pursuing",
+          nextAction: "Draft already in Outbox — review and approve",
+          updatedAt: new Date(),
+        })
+        .where(eq(opportunities.id, opportunityId));
+      revalidatePath("/researched");
+      return;
+    }
+  }
+
   // ADDRESS FIRST (Rameel 2026-09-21: "if you don't have an email, why are
   // you generating emails"): resolve a sendable address BEFORE any drafting.
   // Stored contact emails win; otherwise Apollo→Hunter across up to four
