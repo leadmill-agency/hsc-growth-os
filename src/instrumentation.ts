@@ -117,6 +117,16 @@ export async function register() {
       console.error("[scheduler] TDLR pull failed:", err);
     }
 
+    // Contacts on researched companies get their Apollo/Hunter lookup
+    // automatically — a few per tick, once per contact.
+    try {
+      const { enrichResearchedContacts } = await import("@/lib/actions/contact-enrichment");
+      const found = await enrichResearchedContacts(db);
+      if (found) console.log(`[scheduler] enriched ${found} contact email(s)`);
+    } catch (err) {
+      console.error("[scheduler] contact enrichment failed:", err);
+    }
+
     // One-off cards idle 7 days quietly archive (rollouts and pinned never do)
     try {
       const { archiveStaleOneOffs } = await import("@/lib/actions/archive-sweep");

@@ -416,8 +416,10 @@ export default async function ResearchedPage({
                                 {c.title}
                                 {c.email ? (
                                   <span className="text-emerald-700"> · email found</span>
+                                ) : c.emailLookupAt ? (
+                                  <span className="text-amber-700"> · Apollo + Hunter came up empty</span>
                                 ) : (
-                                  <span className="text-amber-700"> · no email found</span>
+                                  <span className="text-steel"> · lookup pending</span>
                                 )}
                                 {c.linkedinUrl && (
                                   <a href={c.linkedinUrl} target="_blank" className="ml-1 underline hover:text-signal">

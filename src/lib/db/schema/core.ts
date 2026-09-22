@@ -49,6 +49,9 @@ export const contacts = pgTable("contacts", {
   lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true }),
   source: text("source"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  // When Apollo/Hunter last ran for this contact — distinguishes "never
+  // looked up" from "looked up, nothing found" (Rameel 2026-09-21).
+  emailLookupAt: timestamp("email_lookup_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
