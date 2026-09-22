@@ -565,8 +565,21 @@ export async function writeEmailAction(formData: FormData) {
         }
         break;
       }
-    } catch {
-      // finder is best-effort; keep trying the next candidate
+    } catch (err) {
+      const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
+      if (err instanceof FinderQuotaError) {
+        const { logActivity } = await import("@/lib/events");
+        await logActivity(db, {
+          entityType: "opportunity",
+          entityId: opportunityId,
+          action: "outreach.finder_quota",
+          detail: `${account.name} — ${err.message}; lookups paused until credits refresh. Paste an address on the card to draft now.`,
+          actor: "system",
+        });
+        revalidatePath("/researched");
+        return;
+      }
+      // other finder errors are best-effort; keep trying the next candidate
     }
   }
 

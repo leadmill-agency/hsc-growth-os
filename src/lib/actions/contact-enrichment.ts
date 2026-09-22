@@ -19,15 +19,27 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
   const accountIds = [...new Set(activeOpps.map((o) => o.accountId).filter((x): x is string => !!x))];
   if (accountIds.length === 0) return 0;
 
-  const pending = await db.query.contacts.findMany({
-    where: and(
-      inArray(contacts.accountId, accountIds),
-      isNull(contacts.email),
-      isNull(contacts.emailLookupAt)
-    ),
+  // CREDIT DISCIPLINE (Rameel 2026-09-21): auto-enrichment aims for TWO
+  // reachable people per company, not every stored name — the rest stay
+  // on-demand (Write email tries four; the chip has Find/paste). Roughly
+  // halves Apollo credit burn across the backlog.
+  const allForAccounts = await db.query.contacts.findMany({
+    where: inArray(contacts.accountId, accountIds),
     orderBy: (c, { desc: d }) => [d(c.influenceScore)],
-    limit,
   });
+  const byAccount = new Map<string, typeof allForAccounts>();
+  for (const c of allForAccounts) {
+    const list = byAccount.get(c.accountId!) ?? [];
+    list.push(c);
+    byAccount.set(c.accountId!, list);
+  }
+  const pending: typeof allForAccounts = [];
+  for (const list of byAccount.values()) {
+    const covered = list.filter((c) => c.email).length;
+    if (covered >= 2) continue;
+    pending.push(...list.filter((c) => !c.email && !c.emailLookupAt).slice(0, 2 - covered));
+  }
+  pending.splice(limit);
   if (pending.length === 0) return 0;
 
   const acctRows = await db.query.accounts.findMany({
@@ -45,6 +57,8 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
     let email: string | null = null;
     if (name && (domain || acct?.name)) {
       try {
+        const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
+        void FinderQuotaError;
         const f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
         // Guard against stale org charts: an address on a DIFFERENT domain
         // than the company's means the person likely moved on — don't store
@@ -60,8 +74,15 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
             actor: "system",
           });
         }
-      } catch {
-        // finder is best-effort
+      } catch (err) {
+        const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
+        if (err instanceof FinderQuotaError) {
+          // Out of credits ≠ "no email exists": stop the pass WITHOUT marking
+          // this contact attempted, so it retries when credits refresh.
+          console.warn(`[enrichment] ${err.message} — pausing pass`);
+          return found;
+        }
+        // other finder errors are best-effort
       }
     }
     await db

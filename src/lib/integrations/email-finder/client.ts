@@ -23,6 +23,15 @@ export function setEmailFinderForTests(fn: FinderOverride | null) {
   testOverride = fn;
 }
 
+/** Thrown when a provider says we're out of credits/requests — callers must
+ *  NOT treat it as "no email exists" (Rameel 2026-09-21). */
+export class FinderQuotaError extends Error {
+  constructor(provider: string, status: number) {
+    super(`${provider} quota/limit hit (HTTP ${status})`);
+    this.name = "FinderQuotaError";
+  }
+}
+
 /** Apollo People Match — richer contact DB; primary when APOLLO_API_KEY is set. */
 async function findViaApollo(params: FindEmailParams): Promise<FoundEmail | null> {
   const key = process.env.APOLLO_API_KEY;
@@ -43,6 +52,7 @@ async function findViaApollo(params: FindEmailParams): Promise<FoundEmail | null
       }),
     });
     if (!res.ok) {
+      if ([402, 403, 429].includes(res.status)) throw new FinderQuotaError("apollo", res.status);
       console.warn(`[email-finder] apollo HTTP ${res.status} for ${params.fullName}`);
       return null;
     }
@@ -54,6 +64,7 @@ async function findViaApollo(params: FindEmailParams): Promise<FoundEmail | null
     const confidence = json.person?.email_status === "verified" ? 95 : 60;
     return { email, confidence, source: "apollo" };
   } catch (err) {
+    if (err instanceof FinderQuotaError) throw err;
     console.warn(`[email-finder] apollo lookup failed:`, (err as Error).message);
     return null;
   }
