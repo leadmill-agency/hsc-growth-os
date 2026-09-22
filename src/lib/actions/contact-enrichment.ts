@@ -247,3 +247,63 @@ export async function discoverContactsForUncovered(db: Db, limit = 3): Promise<n
   }
   return created;
 }
+
+/**
+ * Auto-dismiss researched cards with NO contact path (Rameel 2026-09-21: "if
+ * Apollo comes up empty... I don't know what I'd do without the email").
+ * Fires only after the whole chain is exhausted: contacts (if any) all looked
+ * up with zero addresses AND Apollo people discovery already ran for the
+ * account. Logged as opportunity.auto_dismissed — deliberately NOT
+ * opportunity.dismissed, so the radar's learning only ever trains on human
+ * judgments. The 90-day suppression applies as usual; a fresh signal after
+ * that earns a fresh look.
+ */
+export async function autoDismissUnreachable(db: Db): Promise<number> {
+  const { activities } = await import("@/lib/db/schema");
+  const { notInArray, sql } = await import("drizzle-orm");
+  const researched = await db.query.opportunities.findMany({
+    where: and(
+      eq(opportunities.stage, "researched"),
+      notInArray(sql`coalesce(${opportunities.opportunityType}, '')`, ["incoming_bid", "bid"])
+    ),
+    limit: 200,
+  });
+  const accountIds = [...new Set(researched.map((o) => o.accountId).filter((x): x is string => !!x))];
+  if (accountIds.length === 0) return 0;
+  const allContacts = await db.query.contacts.findMany({
+    where: inArray(contacts.accountId, accountIds),
+  });
+  const byAccount = new Map<string, typeof allContacts>();
+  for (const c of allContacts) {
+    const list = byAccount.get(c.accountId!) ?? [];
+    list.push(c);
+    byAccount.set(c.accountId!, list);
+  }
+  const searched = await db.query.activities.findMany({
+    where: and(eq(activities.action, "apollo.people_searched"), inArray(activities.entityId, accountIds)),
+    columns: { entityId: true },
+  });
+  const discoveryDone = new Set(searched.map((s) => s.entityId));
+
+  let dismissed = 0;
+  for (const o of researched) {
+    if (!o.accountId) continue;
+    const list = byAccount.get(o.accountId) ?? [];
+    const anyEmail = list.some((c) => c.email);
+    const anyPending = list.some((c) => !c.email && !c.emailLookupAt);
+    if (anyEmail || anyPending || !discoveryDone.has(o.accountId)) continue;
+    await db
+      .update(opportunities)
+      .set({ stage: "dismissed", updatedAt: new Date() })
+      .where(eq(opportunities.id, o.id));
+    await logActivity(db, {
+      entityType: "opportunity",
+      entityId: o.id,
+      action: "opportunity.auto_dismissed",
+      detail: `${o.name} — no reachable contact: ${list.length ? `${list.length} people tried, Apollo + Hunter empty` : "research and Apollo discovery found nobody"}. Resurfaces on a new signal after 90 days.`,
+      actor: "system",
+    });
+    dismissed++;
+  }
+  return dismissed;
+}

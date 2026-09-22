@@ -129,6 +129,9 @@ export async function register() {
       if (discovered) console.log(`[scheduler] discovered ${discovered} decision-maker(s) via Apollo`);
       const found = await enrichResearchedContacts(db);
       if (found) console.log(`[scheduler] enriched ${found} contact email(s)`);
+      const { autoDismissUnreachable } = await import("@/lib/actions/contact-enrichment");
+      const closed = await autoDismissUnreachable(db);
+      if (closed) console.log(`[scheduler] auto-dismissed ${closed} unreachable card(s)`);
     } catch (err) {
       console.error("[scheduler] contact enrichment failed:", err);
     }
