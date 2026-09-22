@@ -95,3 +95,66 @@ export async function findWorkEmail(params: FindEmailParams): Promise<FoundEmail
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// People DISCOVERY (Rameel 2026-09-21: "shouldn't you be the person to find in
+// Apollo?... look at an account, see who is tenant/owner, then find their
+// emails"). When public research names nobody, Apollo's people search finds
+// the decision-makers by title; the normal email lookup then reveals their
+// addresses. Search itself spends no export credits — reveals do.
+
+export interface FoundPerson {
+  name: string;
+  title: string | null;
+  linkedinUrl: string | null;
+}
+
+type PeopleSearchOverride = (params: {
+  domain?: string;
+  company?: string;
+  titles: string[];
+}) => Promise<FoundPerson[]>;
+let peopleSearchOverride: PeopleSearchOverride | null = null;
+
+export function setPeopleSearchForTests(fn: PeopleSearchOverride | null) {
+  peopleSearchOverride = fn;
+}
+
+export async function searchPeopleAtCompany(params: {
+  domain?: string;
+  company?: string;
+  titles: string[];
+  limit?: number;
+}): Promise<FoundPerson[]> {
+  if (peopleSearchOverride) return peopleSearchOverride(params);
+  const key = process.env.APOLLO_API_KEY;
+  if (!key || (!params.domain && !params.company)) return [];
+  try {
+    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      body: JSON.stringify({
+        ...(params.domain
+          ? { q_organization_domains_list: [params.domain], q_organization_domains: params.domain }
+          : { q_organization_name: params.company }),
+        person_titles: params.titles,
+        per_page: params.limit ?? 5,
+      }),
+    });
+    if (!res.ok) {
+      if ([402, 403, 429].includes(res.status)) throw new FinderQuotaError("apollo", res.status);
+      console.warn(`[email-finder] apollo people search HTTP ${res.status}`);
+      return [];
+    }
+    const json = (await res.json()) as {
+      people?: { name?: string; title?: string | null; linkedin_url?: string | null }[];
+    };
+    return (json.people ?? [])
+      .filter((p): p is { name: string; title: string | null; linkedin_url: string | null } => !!p.name)
+      .map((p) => ({ name: p.name, title: p.title ?? null, linkedinUrl: p.linkedin_url ?? null }));
+  } catch (err) {
+    if (err instanceof FinderQuotaError) throw err;
+    console.warn(`[email-finder] apollo people search failed:`, (err as Error).message);
+    return [];
+  }
+}

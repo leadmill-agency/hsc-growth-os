@@ -118,9 +118,15 @@ export async function register() {
     }
 
     // Contacts on researched companies get their Apollo/Hunter lookup
-    // automatically — a few per tick, once per contact.
+    // automatically — a few per tick, once per contact. Companies where nobody
+    // is reachable get an Apollo people SEARCH first (who runs real estate/
+    // construction there), then the reveal.
     try {
-      const { enrichResearchedContacts } = await import("@/lib/actions/contact-enrichment");
+      const { enrichResearchedContacts, discoverContactsForUncovered } = await import(
+        "@/lib/actions/contact-enrichment"
+      );
+      const discovered = await discoverContactsForUncovered(db);
+      if (discovered) console.log(`[scheduler] discovered ${discovered} decision-maker(s) via Apollo`);
       const found = await enrichResearchedContacts(db);
       if (found) console.log(`[scheduler] enriched ${found} contact email(s)`);
     } catch (err) {
