@@ -148,7 +148,7 @@ export async function discoverContactsForUncovered(db: Db, limit = 3): Promise<n
   if (todo.length === 0) return 0;
 
   const acctRows = await db.query.accounts.findMany({ where: inArray(accounts.id, todo) });
-  const { searchPeopleAtCompany, FinderQuotaError } = await import(
+  const { searchPeopleAtCompany, revealApolloPerson, FinderQuotaError } = await import(
     "@/lib/integrations/email-finder/client"
   );
   let created = 0;
@@ -156,41 +156,54 @@ export async function discoverContactsForUncovered(db: Db, limit = 3): Promise<n
     const domain =
       acct.domain ?? acct.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
     const titles = DISCOVERY_TITLES[acct.accountType ?? ""] ?? DISCOVERY_TITLES.default;
-    let people: Awaited<ReturnType<typeof searchPeopleAtCompany>> = [];
+    let found = 0;
     try {
-      people = await searchPeopleAtCompany({ domain, company: acct.name, titles, limit: 4 });
+      const candidates = await searchPeopleAtCompany({ domain, company: acct.name, titles, limit: 5 });
+      // Reveal by id (this is the credit spend): emailable people first, two
+      // per company.
+      const ordered = [...candidates].sort((a, b) => Number(b.hasEmail) - Number(a.hasEmail));
+      const existingNames = new Set(
+        (byAccount.get(acct.id) ?? []).map((c) =>
+          [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase()
+        )
+      );
+      for (const cand of ordered) {
+        if (found >= 2) break;
+        const person = await revealApolloPerson(cand.id);
+        if (!person) continue;
+        const fullName = [person.firstName, person.lastName].filter(Boolean).join(" ");
+        if (existingNames.has(fullName.toLowerCase())) continue;
+        // Moved-on guard: an email on a different domain than the company's
+        // means Apollo's org data is stale — store the person, not the email.
+        const emailOk =
+          person.email && (!domain || person.email.toLowerCase().endsWith(`@${domain.toLowerCase()}`));
+        await db.insert(contacts).values({
+          accountId: acct.id,
+          firstName: person.firstName,
+          lastName: person.lastName,
+          title: person.title ?? cand.title,
+          email: emailOk ? person.email : null,
+          linkedinUrl: person.linkedinUrl,
+          source: "apollo_search",
+          influenceScore: 70,
+          emailLookupAt: new Date(),
+        });
+        created++;
+        found++;
+      }
     } catch (err) {
       if (err instanceof FinderQuotaError) {
         console.warn(`[discovery] ${err.message} — pausing`);
         return created;
       }
     }
-    const existing = new Set(
-      (byAccount.get(acct.id) ?? []).map((c) =>
-        [c.firstName, c.lastName].filter(Boolean).join(" ").toLowerCase()
-      )
-    );
-    for (const p of people.slice(0, 3)) {
-      if (existing.has(p.name.toLowerCase())) continue;
-      const [firstName, ...rest] = p.name.split(/\s+/);
-      await db.insert(contacts).values({
-        accountId: acct.id,
-        firstName,
-        lastName: rest.join(" ") || null,
-        title: p.title,
-        linkedinUrl: p.linkedinUrl,
-        source: "apollo_search",
-        influenceScore: 70,
-      });
-      created++;
-    }
     await logActivity(db, {
       entityType: "account",
       entityId: acct.id,
       action: "apollo.people_searched",
       detail:
-        people.length > 0
-          ? `Apollo found ${people.length} decision-maker(s) at ${acct.name} by title (${titles.slice(0, 2).join(", ")}…) — emails resolving next`
+        found > 0
+          ? `Apollo found ${found} decision-maker(s) at ${acct.name} by title (${titles.slice(0, 2).join(", ")}…)`
           : `Apollo has nobody matching ${titles.slice(0, 2).join("/")} at ${acct.name}`,
       actor: "system",
     });

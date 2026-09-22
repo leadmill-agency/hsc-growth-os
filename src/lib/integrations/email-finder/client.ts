@@ -104,8 +104,19 @@ export async function findWorkEmail(params: FindEmailParams): Promise<FoundEmail
 // addresses. Search itself spends no export credits — reveals do.
 
 export interface FoundPerson {
-  name: string;
+  /** Apollo person id — last names come back obfuscated from search; the id
+   *  is what people/match reveals (name + email, 1 credit). */
+  id: string;
+  firstName: string;
   title: string | null;
+  hasEmail: boolean;
+}
+
+export interface RevealedPerson {
+  firstName: string;
+  lastName: string | null;
+  title: string | null;
+  email: string | null;
   linkedinUrl: string | null;
 }
 
@@ -115,9 +126,14 @@ type PeopleSearchOverride = (params: {
   titles: string[];
 }) => Promise<FoundPerson[]>;
 let peopleSearchOverride: PeopleSearchOverride | null = null;
+let revealOverride: ((id: string) => Promise<RevealedPerson | null>) | null = null;
 
-export function setPeopleSearchForTests(fn: PeopleSearchOverride | null) {
-  peopleSearchOverride = fn;
+export function setPeopleSearchForTests(
+  search: PeopleSearchOverride | null,
+  reveal?: (id: string) => Promise<RevealedPerson | null>
+) {
+  peopleSearchOverride = search;
+  revealOverride = reveal ?? null;
 }
 
 export async function searchPeopleAtCompany(params: {
@@ -130,12 +146,12 @@ export async function searchPeopleAtCompany(params: {
   const key = process.env.APOLLO_API_KEY;
   if (!key || (!params.domain && !params.company)) return [];
   try {
-    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/search", {
+    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Api-Key": key },
       body: JSON.stringify({
         ...(params.domain
-          ? { q_organization_domains_list: [params.domain], q_organization_domains: params.domain }
+          ? { q_organization_domains_list: [params.domain] }
           : { q_organization_name: params.company }),
         person_titles: params.titles,
         per_page: params.limit ?? 5,
@@ -147,14 +163,56 @@ export async function searchPeopleAtCompany(params: {
       return [];
     }
     const json = (await res.json()) as {
-      people?: { name?: string; title?: string | null; linkedin_url?: string | null }[];
+      people?: { id?: string; first_name?: string; title?: string | null; has_email?: boolean }[];
     };
     return (json.people ?? [])
-      .filter((p): p is { name: string; title: string | null; linkedin_url: string | null } => !!p.name)
-      .map((p) => ({ name: p.name, title: p.title ?? null, linkedinUrl: p.linkedin_url ?? null }));
+      .filter((p): p is { id: string; first_name: string; title: string | null; has_email?: boolean } => !!p.id && !!p.first_name)
+      .map((p) => ({ id: p.id, firstName: p.first_name, title: p.title ?? null, hasEmail: !!p.has_email }));
   } catch (err) {
     if (err instanceof FinderQuotaError) throw err;
     console.warn(`[email-finder] apollo people search failed:`, (err as Error).message);
     return [];
+  }
+}
+
+/** Reveal a searched person by Apollo id: full name + work email (1 credit). */
+export async function revealApolloPerson(id: string): Promise<RevealedPerson | null> {
+  if (revealOverride) return revealOverride(id);
+  const key = process.env.APOLLO_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.apollo.io/api/v1/people/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Api-Key": key },
+      body: JSON.stringify({ id, reveal_personal_emails: false }),
+    });
+    if (!res.ok) {
+      if ([402, 403, 429].includes(res.status)) throw new FinderQuotaError("apollo", res.status);
+      console.warn(`[email-finder] apollo reveal HTTP ${res.status} for ${id}`);
+      return null;
+    }
+    const json = (await res.json()) as {
+      person?: {
+        first_name?: string;
+        last_name?: string;
+        title?: string | null;
+        email?: string | null;
+        linkedin_url?: string | null;
+      };
+    };
+    const person = json.person;
+    if (!person?.first_name) return null;
+    const email = person.email && !person.email.includes("email_not_unlocked") ? person.email : null;
+    return {
+      firstName: person.first_name,
+      lastName: person.last_name ?? null,
+      title: person.title ?? null,
+      email,
+      linkedinUrl: person.linkedin_url ?? null,
+    };
+  } catch (err) {
+    if (err instanceof FinderQuotaError) throw err;
+    console.warn(`[email-finder] apollo reveal failed:`, (err as Error).message);
+    return null;
   }
 }
