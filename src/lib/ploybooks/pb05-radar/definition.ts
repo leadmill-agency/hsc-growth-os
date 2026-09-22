@@ -185,8 +185,11 @@ export const pb05OpportunityRadar: PloybookDefinition = {
         // Permit-style signals (e.g. TDLR) often name a facility/project but no company.
         // Anchor on the project and leave the account null — identifying the owner/GC is
         // Greater Houston gate (Rameel 2026-09-22): outside ~50 miles nothing
-        // is created — except canopy/awning scope, which is statewide.
-        if (!parsed.greater_houston && !parsed.mentions_canopy_or_awning) {
+        // is created — except canopy/awning scope (statewide) and TDLR/CoH
+        // signals, whose geography is guaranteed by the source itself (9-county
+        // pull, City of Houston COs) even when the text names no city.
+        const sourceIsLocal = ["tdlr", "coh_co"].includes(p.source ?? "");
+        if (!parsed.greater_houston && !parsed.mentions_canopy_or_awning && !sourceIsLocal) {
           await logActivity(ctx.db, {
             entityType: "ploybook_run",
             entityId: ctx.runId,
