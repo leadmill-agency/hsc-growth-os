@@ -74,9 +74,9 @@ async function main() {
   console.log(`COLLAPSED=${collapsed} duplicate researched card(s)`);
 
   // 3) Fresh discovery pass: clear markers so every active account re-searches.
-  await db.execute(
-    sql`delete from activities where action = 'apollo.people_searched' and entity_id = any(${accountIds}::uuid[])`
-  );
+  await db
+    .delete(activities)
+    .where(and(eq(activities.action, "apollo.people_searched"), inArray(activities.entityId, accountIds)));
   let discovered = 0;
   for (let i = 0; i < 30; i++) {
     const d = await discoverContactsForUncovered(db, 5);
