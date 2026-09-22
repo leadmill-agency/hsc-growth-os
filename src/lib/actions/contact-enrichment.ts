@@ -61,11 +61,15 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
     list.push(c);
     byAccount.set(c.accountId!, list);
   }
+  // The target is two FOUND addresses per company — attempts keep going down
+  // the candidate list until that's met (a junk contact returning nothing must
+  // not burn a slot; the Twin Peaks lesson, 2026-09-21). Reveals only charge
+  // on success, so extra attempts are free.
   const pending: typeof allForAccounts = [];
   for (const list of byAccount.values()) {
     const covered = list.filter((c) => c.email).length;
     if (covered >= 2) continue;
-    pending.push(...list.filter((c) => !c.email && !c.emailLookupAt).slice(0, 2 - covered));
+    pending.push(...list.filter((c) => !c.email && !c.emailLookupAt));
   }
   pending.splice(limit);
   if (pending.length === 0) return 0;
@@ -98,16 +102,21 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
         .map((k) => k.email?.toLowerCase().split("@")[1])
         .filter((d): d is string => !!d)
     );
+    const alreadyCovered = (byAccount.get(accountId) ?? []).filter((c) => c.email).length;
     type Result = { c: (typeof batch)[number]; f: Awaited<ReturnType<typeof findWorkEmail>> };
     const results: Result[] = [];
     try {
+      let hits = alreadyCovered;
       for (const c of batch) {
+        if (hits >= 2) break; // two found addresses is the target, not two tries
         const name = [c.firstName, c.lastName].filter(Boolean).join(" ");
         if (!name || (!domain && !acct?.name)) {
           results.push({ c, f: null });
           continue;
         }
-        results.push({ c, f: await findWorkEmail({ fullName: name, domain, company: acct?.name }) });
+        const f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
+        results.push({ c, f });
+        if (f) hits++;
       }
     } catch (err) {
       if (err instanceof FinderQuotaError) {
