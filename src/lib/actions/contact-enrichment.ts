@@ -80,6 +80,30 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
   const acctById = new Map(acctRows.map((a) => [a.id, a]));
   const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
 
+  // Corporate mail domains often differ from the website AND appear in the
+  // research itself (Taco Palenque: site tacopalenque.com, mail
+  // palenquegroup.com — the brief printed a palenquegroup.com address). Harvest
+  // every domain the account's evidence mentions as lookup fallbacks.
+  const { evidence } = await import("@/lib/db/schema");
+  const evRows = await db.query.evidence.findMany({
+    where: and(
+      eq(evidence.entityType, "account"),
+      inArray(evidence.entityId, [...acctById.keys()])
+    ),
+  });
+  const briefDomainsByAccount = new Map<string, string[]>();
+  for (const row of evRows) {
+    const text = JSON.stringify(row.value ?? "");
+    const domains = [...text.matchAll(/[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/g)].map((m) => m[1].toLowerCase());
+    if (domains.length) {
+      const list = briefDomainsByAccount.get(row.entityId) ?? [];
+      briefDomainsByAccount.set(row.entityId, [...new Set([...list, ...domains])]);
+    }
+  }
+
+  // (Firm-hint lookups removed 2026-09-21: Rameel — "I don't want architect
+  // firms, those are never useful. It has to be someone at the company.")
+
   let found = 0;
   // Per-ACCOUNT batches with consensus (2026-09-21, the Twin Peaks lesson):
   // Apollo often returns an email without org context; when two people at the
@@ -114,7 +138,20 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
           results.push({ c, f: null });
           continue;
         }
-        const f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
+        let f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
+        const via: "firm" | undefined = undefined;
+        void via;
+        // Fallback: mail domains the research evidence itself mentions.
+        if (!f) {
+          for (const alt of (briefDomainsByAccount.get(accountId) ?? []).slice(0, 3)) {
+            if (alt === domain) continue;
+            f = await findWorkEmail({ fullName: name, domain: alt });
+            if (f) {
+              knownMailDomains.add(alt);
+              break;
+            }
+          }
+        }
         results.push({ c, f });
         if (f) hits++;
       }
@@ -157,6 +194,26 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
     }
   }
   return found;
+}
+
+
+// THE CONTACT RULE (Rameel 2026-09-21): a contact must be a PERSON who works
+// AT the company. Firms-as-contacts (Interplan LLC), filing agents, outside
+// architects/engineers/brokers, and corporate entities are never useful —
+// they pollute cards and burn lookups.
+const ENTITY_NAME = /\b(llc|inc|corp(oration)?|ltd|llp|l\.?p\.?|group|services?|company|co\.|holdings|architects?|engineering|design|associates|partners|enterprises|management|properties)\b/i;
+const EXTERNAL_TITLE = /architect|\ba\/e\b|of record|design firm|engineer|leasing agent|listing agent|broker|attorney|filing|permit (agent|expeditor)|consultant \(/i;
+
+export function isPersonAtCompany(contact: {
+  firstName?: string | null;
+  lastName?: string | null;
+  title?: string | null;
+}): boolean {
+  const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
+  if (!name || !contact.lastName) return false; // entities land as one long "first name"
+  if (ENTITY_NAME.test(name)) return false;
+  if (contact.title && EXTERNAL_TITLE.test(contact.title)) return false;
+  return true;
 }
 
 // Titles that buy signs, by what kind of company it is. Apollo matches these

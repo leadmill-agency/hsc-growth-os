@@ -44,7 +44,10 @@ export async function buildStakeholderMap(
   const llm = getLLMClient();
   const plan = await llm.generateStructured({
     system:
-      "You build a stakeholder map for a signage subcontractor pursuing a GC. Prefer " +
+      "You build a stakeholder map for a signage subcontractor pursuing a GC. ONLY name " +
+      "PEOPLE employed AT the company itself — never architecture/engineering firms, " +
+      "filing agents, brokers, or any outside professional (owner rule: those are never " +
+      "useful; it has to be someone at the company). Prefer " +
       "project-specific estimating/preconstruction contacts over senior executives (PB01 §9). " +
       "Use ONLY people from the research brief; never add names that are not in it. Roles worth " +
       "seeking: estimator, preconstruction, project_manager, procurement, project_executive. " +
@@ -59,8 +62,14 @@ export async function buildStakeholderMap(
     effort: "low",
   });
 
+  const { isPersonAtCompany } = await import("@/lib/actions/contact-enrichment");
   for (const person of plan.people) {
     const [first, ...rest] = person.name.split(" ");
+    // THE CONTACT RULE (Rameel 2026-09-21): people AT the company only —
+    // never firms, filing agents, or outside architects/engineers/brokers.
+    if (!isPersonAtCompany({ firstName: first, lastName: rest.join(" ") || null, title: person.title })) {
+      continue;
+    }
     await db.insert(contacts).values({
       accountId: params.accountId,
       firstName: first,

@@ -76,7 +76,11 @@ export async function composeReadableBrief(raw: AccountResearchBrief): Promise<R
       "whats_happening: 2-5 bullets, each ONE complete sentence about current activity. " +
       "opportunity: 1-3 sentences on what sign/awning/canopy work is plausibly in play for " +
       "HSC (channel letters, monuments, storefront, wayfinding, awnings). how_to_approach: " +
-      "2-4 plain sentences a human says out loud, NAMES FIRST: who to email first and why " +
+      "2-4 plain sentences a human says out loud, NAMES FIRST — but ONLY people employed " +
+      "AT the company itself; NEVER tell the owner to email an architect, A/E firm, " +
+      "engineer, broker, or filing agent (owner rule: those are never useful). If only " +
+      "outside professionals are known, say plainly that the internal contact is " +
+      "unknown and what kind of person to find. Who to email first and why " +
       "THEY are the decision-maker, the single ask in plain words, and the backup person. " +
       "NEVER a numbered plan, never ops jargon ('monitored outreach', 'procurement splits', " +
       "'capability package'), never registry-monitoring instructions — the owner wants to " +

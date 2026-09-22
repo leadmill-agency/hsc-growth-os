@@ -141,6 +141,9 @@ export const pb04FacilityPortfolio: PloybookDefinition = {
         }
         for (const person of profile.facility_contacts) {
           const [first, ...rest] = person.name.split(" ");
+          const { isPersonAtCompany } = await import("@/lib/actions/contact-enrichment");
+          if (!isPersonAtCompany({ firstName: first, lastName: rest.join(" ") || null, title: person.title }))
+            continue;
           await ctx.db.insert(contacts).values({
             accountId,
             firstName: first,
