@@ -77,49 +77,75 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
   const { findWorkEmail } = await import("@/lib/integrations/email-finder/client");
 
   let found = 0;
+  // Per-ACCOUNT batches with consensus (2026-09-21, the Twin Peaks lesson):
+  // Apollo often returns an email without org context; when two people at the
+  // same company resolve to the SAME unknown mail domain, that domain IS the
+  // company's mail domain (twinpeaksrestaurant.com site, tprest.com mail) —
+  // accept the batch instead of rejecting everyone one by one.
+  const pendingByAccount = new Map<string, typeof pending>();
   for (const c of pending) {
-    const acct = acctById.get(c.accountId!);
-    const name = [c.firstName, c.lastName].filter(Boolean).join(" ");
+    const list = pendingByAccount.get(c.accountId!) ?? [];
+    list.push(c);
+    pendingByAccount.set(c.accountId!, list);
+  }
+  const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
+  for (const [accountId, batch] of pendingByAccount) {
+    const acct = acctById.get(accountId);
     const domain =
       acct?.domain ?? acct?.website?.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-    let email: string | null = null;
-    if (name && (domain || acct?.name)) {
-      try {
-        const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
-        void FinderQuotaError;
-        const f = await findWorkEmail({ fullName: name, domain, company: acct?.name });
-        const knownMailDomains = new Set(
-          (byAccount.get(c.accountId!) ?? [])
-            .map((k) => k.email?.toLowerCase().split("@")[1])
-            .filter((d): d is string => !!d)
-        );
-        if (f && acct && emailBelongsToCompany({ name: acct.name, domain }, f, knownMailDomains)) {
-          email = f.email;
-        } else if (f) {
-          await logActivity(db, {
-            entityType: "contact",
-            entityId: c.id,
-            action: "contact.moved_on",
-            detail: `${name} — finder returned an address at a different company (${f.email.split("@")[1]}); likely no longer at ${acct?.name}`,
-            actor: "system",
-          });
+    const knownMailDomains = new Set(
+      (byAccount.get(accountId) ?? [])
+        .map((k) => k.email?.toLowerCase().split("@")[1])
+        .filter((d): d is string => !!d)
+    );
+    type Result = { c: (typeof batch)[number]; f: Awaited<ReturnType<typeof findWorkEmail>> };
+    const results: Result[] = [];
+    try {
+      for (const c of batch) {
+        const name = [c.firstName, c.lastName].filter(Boolean).join(" ");
+        if (!name || (!domain && !acct?.name)) {
+          results.push({ c, f: null });
+          continue;
         }
-      } catch (err) {
-        const { FinderQuotaError } = await import("@/lib/integrations/email-finder/client");
-        if (err instanceof FinderQuotaError) {
-          // Out of credits ≠ "no email exists": stop the pass WITHOUT marking
-          // this contact attempted, so it retries when credits refresh.
-          console.warn(`[enrichment] ${err.message} — pausing pass`);
-          return found;
-        }
-        // other finder errors are best-effort
+        results.push({ c, f: await findWorkEmail({ fullName: name, domain, company: acct?.name }) });
+      }
+    } catch (err) {
+      if (err instanceof FinderQuotaError) {
+        // Out of credits ≠ "no email exists": stop WITHOUT marking the batch
+        // attempted, so it retries when credits refresh.
+        console.warn(`[enrichment] ${err.message} — pausing pass`);
+        return found;
       }
     }
-    await db
-      .update(contacts)
-      .set({ emailLookupAt: new Date(), ...(email ? { email } : {}), updatedAt: new Date() })
-      .where(eq(contacts.id, c.id));
-    if (email) found++;
+    // Consensus: a mail domain two+ batch results share is the company's.
+    const domainCounts = new Map<string, number>();
+    for (const r of results) {
+      const d = r.f?.email.toLowerCase().split("@")[1];
+      if (d) domainCounts.set(d, (domainCounts.get(d) ?? 0) + 1);
+    }
+    for (const [d, n] of domainCounts) if (n >= 2) knownMailDomains.add(d);
+
+    for (const { c, f } of results) {
+      const name = [c.firstName, c.lastName].filter(Boolean).join(" ");
+      let email: string | null = null;
+      if (f && acct && emailBelongsToCompany({ name: acct.name, domain }, f, knownMailDomains)) {
+        email = f.email;
+        knownMailDomains.add(f.email.toLowerCase().split("@")[1]);
+      } else if (f) {
+        await logActivity(db, {
+          entityType: "contact",
+          entityId: c.id,
+          action: "contact.moved_on",
+          detail: `${name} — finder returned an address at a different company (${f.email.split("@")[1]}); likely no longer at ${acct?.name}`,
+          actor: "system",
+        });
+      }
+      await db
+        .update(contacts)
+        .set({ emailLookupAt: new Date(), ...(email ? { email } : {}), updatedAt: new Date() })
+        .where(eq(contacts.id, c.id));
+      if (email) found++;
+    }
   }
   return found;
 }
