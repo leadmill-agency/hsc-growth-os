@@ -47,10 +47,6 @@ export async function enrichResearchedContacts(db: Db, limit = 6): Promise<numbe
   const accountIds = [...new Set(activeOpps.map((o) => o.accountId).filter((x): x is string => !!x))];
   if (accountIds.length === 0) return 0;
 
-  // CREDIT DISCIPLINE (Rameel 2026-09-21): auto-enrichment aims for TWO
-  // reachable people per company, not every stored name — the rest stay
-  // on-demand (Write email tries four; the chip has Find/paste). Roughly
-  // halves Apollo credit burn across the backlog.
   const allForAccounts = await db.query.contacts.findMany({
     where: inArray(contacts.accountId, accountIds),
     orderBy: (c, { desc: d }) => [d(c.influenceScore)],

@@ -48,47 +48,84 @@ A PB is done only per its own Definition of Done. Phase order is master PRD §26
 
 ## Field-learned rules (live ops, 2026-09 — each learned the hard way)
 
+**Resuming work? Read [`docs/OPERATING-STATE.md`](docs/OPERATING-STATE.md) first** — current
+UI flow, owner rules in force, live numbers, and the prioritized open items.
+
+### Funnel and triage
 - **Nothing researches by itself.** `AUTO_PURSUE_ENABLED` stays false; a human clicks Pursue.
-  Funnel: Opportunities = one triage inbox (Pursue / Bid this / Dismiss-with-reason) →
-  Researched hub (briefs + emails + bid desk). Dismissals REQUIRE a reason code — they feed
-  radar scoring as ground truth (except `unclear` = presentation feedback, and system
-  `opportunity.deduped` actions, which the feedback loop deliberately ignores).
-- **One radar card per company** (`dedupeAccountWide` in `createOpportunity`, used by PB05):
-  the scout re-tells the same story daily with new wording, so (account, project) dedupe
-  alone re-carded dismissed companies. Re-sightings attach to the active card; a closed card
-  (dismissed/won/lost) suppresses re-carding for **90 days** from close, then the company may
-  earn a fresh card. Bids stay one-card-per-project (never set the flag in PB10).
-- **Fortune-1000-scale corporate chains never become cards** (`national_chain` in PB05's
-  parse): their sign packages run through national vendor programs. Franchisee-driven
-  buildouts and emerging brands DO card — the local operator buys the signs. Skips are
-  logged to History (`radar.national_chain_skipped`).
-- **The boot sweep must not steal runs.** Scripts execute runs against the same database
-  from outside the server process; a boot sweep with `runningOlderThanMs: 0` adopted a
-  mid-draft run and produced duplicate approvals (2026-09-18). Runs heartbeat `updatedAt`
-  at each step start — boot threshold 10 min, steady 15 min. If a step ever has duplicate
-  approvals anyway, the runner honors the first human decision and supersedes the rest.
-- **Cross-bundle module state is unreliable in Next** (instrumentation vs server-action
-  bundles): the send layer lazily self-registers the Resend adapter. Never assume a
-  register-at-boot singleton is visible from a server action.
-- **Hard zod `.max()` on AI output is guidance-as-fatal** — it killed PB16/PB17/PB18 runs.
-  Keep limits out of the schema; clamp in code after generation. `z.toJSONSchema` throws on
-  `.transform`, so transforms can't do it either (verified live).
-- **Models copy the vocabulary they're shown**: pre-translate metrics/fields to plain
-  English before prompting (PB18 `describeMetrics`, brief composition from labeled text,
-  outreach never says "registered with TDLR"). Outreach voice = `OWNER_VOICE` in
-  `src/lib/actions/outreach.ts` (his real reply-getting emails; routing-question CTA;
-  one-thought paragraphs; brochure-speak banned).
-- **Weekly SEO scan** (`src/lib/integrations/seo-scan/weekly.ts`): Mondays after intake,
-  PB16 drafts one city × product page and PB17 one article, behind publish approvals.
-  Topics come from live GSC content gaps first (backlog fallback), filtered by
-  `OFF_FOCUS_PATTERN` (banners/vinyl/wraps never get content — outsourced-lead territory,
-  see HSC/CLAUDE.md business focus). Coverage/dedupe is keyword-STEM based
-  (`findTopicCoveringUrls` / `topicsOverlap` in the sitemap integration) — a slug-substring
-  check shipped a near-duplicate of an existing blog post. Manual run:
-  `npx tsx scripts/run-seo-scan-now.ts`. When a draft overlaps an existing page, MERGE the
-  new material into that URL; never publish a twin.
-- **Generated opportunities are GREATER HOUSTON only** (~50 mi of downtown, Rameel
-  2026-09-22): the radar skips outside-area signals, the scout hunts Houston-area news,
-  TDLR pulls 9 counties. **Canopy/awning scope stays STATEWIDE** and never auto-passes;
-  inbound bid invites are exempt from the radius. PB10 PASS recommendations auto-close
-  visibly (activity + reason).
+- **Opportunities = one compact table**, tabs Rollouts (default) / One-off projects / Bid
+  invites, split by `opportunities.scale` (radar classifies at parse; torn → one_off).
+  One-offs idle 7 days archive (`archive-sweep.ts`; `pinned` = Keep exempts; stage
+  `archived`, NOT dismissed); a fresh signal resurfaces an archived card. Rollouts never expire.
+- **Dismiss reason is OPTIONAL** (2026-09-22). When given it feeds radar calibration;
+  `unclear` is presentation feedback. System actions (`opportunity.deduped`,
+  `opportunity.auto_dismissed`, `opportunity.archived`) are deliberately NOT
+  `opportunity.dismissed` so the radar only ever learns from human judgment.
+- **Researched = decision queue + Outbox + Bids.** Write email / Company swarm flip the card
+  to `pursuing` the moment a draft exists; rejecting an outreach draft returns it to
+  `researched`. One pending draft per opportunity — retried runs + double clicks stacked
+  duplicates that would double-email people.
+
+### Radar gates (PB05 parse → before any card exists)
+- **Greater Houston only** (`greater_houston`, ~50 mi). Exceptions: canopy/awning scope
+  (statewide), TDLR/CoH sources (local by construction — the LLM mis-placed thin CO names),
+  and inbound bids (PB10 never uses the gate). TDLR pulls 9 counties.
+- **No Fortune-1000 corporate chains** (`national_chain`); franchisee buildouts pass.
+- **One card per company** (`dedupeAccountWide`, PB05 only; bids stay per-project). Re-
+  sightings attach to the active card; a closed card suppresses for 90 days from close.
+  `createAccount` also merges LLM name variants by word stems ("DECA Dental" / "DECA
+  Dental Group") — without that, suppression leaked across the AI's phrasing.
+- Adding a required field to a radar/research zod schema means updating the three parse
+  fixtures (`fixtures/harvey.ts`, `scout.test.ts`, `pb01.golden.test.ts`).
+
+### Contacts and email (the portal's purpose)
+- **THE CONTACT RULE: a person employed AT the company.** `isPersonAtCompany`
+  (`contact-enrichment.ts`) gates every contact writeback; stakeholder + brief prompts ban
+  recommending architects/A-E/brokers/filing agents. Owner: "those are never useful."
+- **Address first:** `writeEmailAction` resolves a sendable address (stored → Apollo →
+  Hunter, up to 4 people) BEFORE drafting and targets the reachable person. No address → no
+  draft, a `outreach.no_address` activity, and a paste-email field on the chip.
+- **Enrichment runs every tick** for every person-at-company on active cards, once each
+  (`emailLookupAt`). **Discovery** (`discoverContactsForUncovered`) runs Apollo
+  `mixed_people/api_search` by decision-maker title for accounts with nobody reachable,
+  then reveals by id via `people/match` (1 credit). Accounts still unreachable after both
+  auto-dismiss (`autoDismissUnreachable`).
+- **Moved-on guard must be org-aware:** mail domains often differ from website domains
+  (Twin Peaks: site twinpeaksrestaurant.com, mail tprest.com). Trust Apollo's org match,
+  mail domains other contacts at the account already use, and 2+ same-domain results in a
+  batch; flag moved-on only when Apollo names a DIFFERENT company. A naive domain check
+  discarded valid VP emails and the auto-dismiss sweep then killed a top card.
+- **Apollo quota errors (402/403/429) throw `FinderQuotaError`** — never treat "out of
+  credits" as "no email exists"; the pass pauses without marking contacts attempted.
+- Apollo deprecated `mixed_people/search` for API keys (HTTP 422) — use `api_search`.
+
+### Sending
+- **Approve = queue, not send** (`send-queue.ts`, minute tick): 9:00am–5:30pm CT weekdays,
+  ~5 min apart with jitter; daily-cap overflow reschedules to the next morning; failures
+  revert to pending with the error on the card. `sendExternal` stays the only send path.
+- **Cross-bundle module state is unreliable in Next**: the send layer lazily self-registers
+  the Resend adapter — never assume a boot-time singleton is visible from a server action.
+
+### Runs, AI, and cost
+- **The boot sweep must not steal runs**: scripts execute runs against the same database;
+  boot threshold 10 min, steady 15 min (runs heartbeat `updatedAt` per step). Duplicate
+  approvals on one step → first human decision wins, rest superseded.
+- **Parallel Pursues tripped OpenAI's 2M tokens/min limit** and killed all four runs:
+  OpenAI clients use `maxRetries: 6`, and new Pursues queue while research is running — the
+  minute tick starts one queued run per minute.
+- **Hard zod `.max()` on AI output is guidance-as-fatal**; clamp in code. `z.toJSONSchema`
+  throws on `.transform`. With `strict: false`, the model can OMIT fields — a
+  `.nullable()` field still fails on `undefined` (see open item in OPERATING-STATE).
+- **Models copy the vocabulary they're shown**: pre-translate fields to plain English.
+  Brief `how_to_approach` = 2–4 sentences, names first, employees only, no numbered plans
+  (`research-brief.ts`). Outreach voice = `OWNER_VOICE` in `outreach.ts`.
+- **Scout** = 4 Houston-aimed themes, 60s apart. Cost baseline ~$1.50–3/day; Sep 21's $24
+  was one-time backfills + parallel deep research.
+
+### SEO scan
+- Mondays: PB16 city × product page + PB17 article, topics from live GSC gaps first
+  (backlog fallback), filtered by `OFF_FOCUS_PATTERN` (banners/vinyl/wraps never).
+  Products include Commercial Awnings (statewide; in-house fabrication; no warranty or
+  price claims until confirmed). Coverage checks are keyword-STEM based; when a draft
+  overlaps an existing page, MERGE into that URL — never publish a twin.
+- PB10 PASS recommendations auto-close visibly; canopy/awning scope never auto-passes.
