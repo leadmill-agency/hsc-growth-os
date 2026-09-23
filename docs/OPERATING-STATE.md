@@ -95,11 +95,12 @@ it in a browser; check changes by build, tests, and direct database queries inst
 3. **Two questions still waiting on Rameel:** does the 5-year warranty cover awnings and
    canopies, and what do awnings typically cost? Keep both off the website until he
    answers.
-4. **Monday 9/22 SEO scan:** check History for the drafts. Earlier dry-runs predicted
-   Sugar Land × Channel Letter Signs and "building signs houston".
-5. **Stale reading-order entry:** `HSC/CLAUDE.md` lists `_project/PROJECT-STATUS.md`, but
-   that file does not exist at that path.
-6. **Not built yet:** detecting replies (a reply should pause follow-ups and flag the
+4. **Weekly SEO scan:** the Monday 9/21 drafts (Sugar Land × Channel Letter Signs, and
+   "sign shop houston tx") were rejected in the portal, then approved by Rameel on 9/23 and
+   published: `/channel-letter-signs-sugar-land-tx` and `/blog/sign-shop-houston-tx`. The
+   article was reframed as a buying guide because the draft duplicated the permit post.
+   Watch that PB17 drafts match the search intent, not only the keywords.
+5. **Not built yet:** detecting replies (a reply should pause follow-ups and flag the
    company) and chasing supplier quotes for bids.
 
 ## Working against production
