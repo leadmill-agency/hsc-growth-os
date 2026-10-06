@@ -5,7 +5,7 @@ import { launchRun, executeRun } from "@/lib/ploybooks/runner";
 import { saveEvidence } from "@/lib/actions/entities";
 import { emitEvent, logActivity } from "@/lib/events";
 
-// Inbound email intake → PB10 Incoming Bid.
+// Inbound email intake → outreach reply detection, then (when enabled) PB10 Incoming Bid.
 // Flow: PlanHub notifies ray@htxsigncrafters.com → Gmail filter forwards to the
 // Resend receiving address → Resend webhook POSTs here (email.received carries
 // metadata only; the body is fetched from the Received Emails API).
@@ -126,6 +126,20 @@ export async function POST(request: NextRequest) {
     detail: `${subject || "(no subject)"} — from ${from}`,
     actor: "integration",
   });
+
+  // Replies and bounces from the Texas outreach lane stop that sequence
+  // (requires the Gmail filter forwarding ray@ mail here, not just PlanHub).
+  const { handleOutreachInbound } = await import("@/lib/outbound/prospecting");
+  if (await handleOutreachInbound(db, { from, subject, text })) {
+    return NextResponse.json({ handled: "outreach_reply" }, { status: 202 });
+  }
+
+  // Bid intake is PAUSED (Rameel 2026-10-01): Jamal works PlanHub directly and
+  // nobody used the Bid invites tab (552 invites, 4 ever estimated). Mail is
+  // still logged above; set BID_INTAKE_ENABLED=true to bring PB10 back.
+  if (process.env.BID_INTAKE_ENABLED !== "true") {
+    return NextResponse.json({ skipped: "bid intake paused" }, { status: 202 });
+  }
 
   const inviteText = `From: ${from}\nSubject: ${subject}\n\n${text}`.slice(0, 20000);
   const runId = await launchRun(db, {

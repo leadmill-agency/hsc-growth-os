@@ -24,6 +24,9 @@ export interface OutboundMessage {
   accountId?: string;
   contactId?: string;
   opportunityId?: string;
+  /** Texas outreach sequence this email belongs to, and which touch (1–3). */
+  enrollmentId?: string;
+  step?: number;
 }
 
 export type SendAdapter = (message: OutboundMessage) => Promise<{ providerId: string }>;
@@ -126,6 +129,10 @@ export async function sendExternal(db: Db, approvalId: string, message: Outbound
       .update(opportunities)
       .set({ stage: "pursuing", nextAction: "Outreach sent — awaiting reply", updatedAt: new Date() })
       .where(eq(opportunities.id, message.opportunityId));
+  }
+  if (message.enrollmentId && message.step) {
+    const { markSequenceSent } = await import("./prospecting");
+    await markSequenceSent(db, message.enrollmentId, message.step, message.subject);
   }
   if (message.accountId) {
     await logActivity(db, {

@@ -134,6 +134,12 @@ export interface RevealedPerson {
   title: string | null;
   email: string | null;
   linkedinUrl: string | null;
+  /** Apollo's verdict on the address — outreach only sends to "verified". */
+  emailStatus?: string | null;
+  city?: string | null;
+  state?: string | null;
+  orgName?: string | null;
+  orgDomain?: string | null;
 }
 
 type PeopleSearchOverride = (params: {
@@ -213,7 +219,11 @@ export async function revealApolloPerson(id: string): Promise<RevealedPerson | n
         last_name?: string;
         title?: string | null;
         email?: string | null;
+        email_status?: string | null;
         linkedin_url?: string | null;
+        city?: string | null;
+        state?: string | null;
+        organization?: { name?: string | null; primary_domain?: string | null } | null;
       };
     };
     const person = json.person;
@@ -225,10 +235,80 @@ export async function revealApolloPerson(id: string): Promise<RevealedPerson | n
       title: person.title ?? null,
       email,
       linkedinUrl: person.linkedin_url ?? null,
+      emailStatus: person.email_status ?? null,
+      city: person.city ?? null,
+      state: person.state ?? null,
+      orgName: person.organization?.name ?? null,
+      orgDomain: person.organization?.primary_domain ?? null,
     };
   } catch (err) {
     if (err instanceof FinderQuotaError) throw err;
     console.warn(`[email-finder] apollo reveal failed:`, (err as Error).message);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// PROSPECT search (Rameel 2026-10-01): Texas-wide people search by job title and
+// employer keywords, for the repeat-buyer outreach lane (contractors, property
+// managers, developers, architects). Search is free; reveal costs 1 credit.
+
+export interface ProspectHit extends FoundPerson {
+  orgName: string | null;
+}
+
+export interface ProspectQuery {
+  titles: string[];
+  keywordTags: string[];
+  employeeRanges: string[];
+  page: number;
+  perPage?: number;
+}
+
+let prospectSearchOverride: ((q: ProspectQuery) => Promise<ProspectHit[]>) | null = null;
+
+export function setProspectSearchForTests(fn: ((q: ProspectQuery) => Promise<ProspectHit[]>) | null) {
+  prospectSearchOverride = fn;
+}
+
+export async function searchTexasProspects(q: ProspectQuery): Promise<ProspectHit[]> {
+  if (prospectSearchOverride) return prospectSearchOverride(q);
+  const key = process.env.APOLLO_API_KEY;
+  if (!key) return [];
+  const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Api-Key": key },
+    body: JSON.stringify({
+      person_titles: q.titles,
+      person_locations: ["Texas, US"],
+      organization_locations: ["Texas, US"],
+      q_organization_keyword_tags: q.keywordTags,
+      organization_num_employees_ranges: q.employeeRanges,
+      page: q.page,
+      per_page: q.perPage ?? 25,
+    }),
+  });
+  if (!res.ok) {
+    if ([402, 403, 429].includes(res.status)) throw new FinderQuotaError("apollo", res.status);
+    console.warn(`[email-finder] apollo prospect search HTTP ${res.status}`);
+    return [];
+  }
+  const json = (await res.json()) as {
+    people?: {
+      id?: string;
+      first_name?: string;
+      title?: string | null;
+      has_email?: boolean;
+      organization?: { name?: string | null } | null;
+    }[];
+  };
+  return (json.people ?? [])
+    .filter((p) => !!p.id && !!p.first_name)
+    .map((p) => ({
+      id: p.id as string,
+      firstName: p.first_name as string,
+      title: p.title ?? null,
+      hasEmail: !!p.has_email,
+      orgName: p.organization?.name ?? null,
+    }));
 }

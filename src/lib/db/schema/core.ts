@@ -268,3 +268,29 @@ export const knowledgeEntries = pgTable("knowledge_entries", {
   content: jsonb("content").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Texas repeat-buyer outreach (Rameel 2026-10-01): general contractors,
+// property managers, developers, and architects found via Apollo, each in a
+// 3-touch template sequence (email + 2 follow-ups). One row per person. No
+// opportunity card is created — these are relationship plays, not projects.
+// Status: active | replied | bounced | stopped | completed | skipped (revealed
+// but not usable — kept so the same person is never revealed twice)
+export const outreachEnrollments = pgTable("outreach_enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  accountId: uuid("account_id").references(() => accounts.id),
+  contactId: uuid("contact_id").references(() => contacts.id),
+  segment: text("segment").notNull(), // gc | property_manager | developer | architect
+  market: text("market").notNull(), // houston | san_antonio | austin | dfw | texas
+  email: text("email").notNull(),
+  apolloPersonId: text("apollo_person_id").unique(),
+  status: text("status").notNull().default("active"),
+  stopReason: text("stop_reason"),
+  lastStepSent: integer("last_step_sent").notNull().default(0),
+  firstSentAt: timestamp("first_sent_at", { withTimezone: true }),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+  // Touch 1's subject + our Message-ID, so follow-ups land in the same thread.
+  threadSubject: text("thread_subject"),
+  threadMessageId: text("thread_message_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

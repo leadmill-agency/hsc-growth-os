@@ -39,7 +39,7 @@ const sourceShort: Record<string, string> = {
 const TABS = [
   { key: "rollouts", label: "Rollouts" },
   { key: "oneoffs", label: "One-off projects" },
-  { key: "bids", label: "Bid invites" },
+  // "Bid invites" tab removed 2026-10-01: Jamal works PlanHub directly.
 ] as const;
 
 function daysAgo(d: Date) {

@@ -183,6 +183,20 @@ export async function resolveApprovalAction(formData: FormData) {
     // Rejecting an outreach draft undoes the Write-email decision: the company
   // card returns to the Companies queue (Rameel 2026-09-22).
   if (decision === "rejected") {
+    // Discarding a Texas outreach email ends that person's sequence — no
+    // follow-ups to someone Rameel decided not to email.
+    try {
+      const { approvals } = await import("@/lib/db/schema");
+      const { eq } = await import("drizzle-orm");
+      const approval = await db.query.approvals.findFirst({ where: eq(approvals.id, approvalId) });
+      const p = (approval?.payload ?? {}) as { enrollmentId?: string };
+      if (approval?.approvalType === "sequence_email" && p.enrollmentId) {
+        const { stopEnrollment } = await import("@/lib/outbound/prospecting");
+        await stopEnrollment(db, p.enrollmentId, "stopped", "Draft discarded by owner");
+      }
+    } catch (err) {
+      console.warn("[reject] could not stop sequence:", (err as Error).message);
+    }
     try {
       const { approvals, opportunities } = await import("@/lib/db/schema");
       const { and, eq } = await import("drizzle-orm");
@@ -212,6 +226,10 @@ export async function resolveApprovalAction(formData: FormData) {
         draft?: { subject?: string; body?: string; alternate_subject?: string; alternate_body?: string };
         followupId?: string;
         opportunityId?: string;
+        enrollmentId?: string;
+        step?: number;
+        accountId?: string;
+        contactId?: string;
       };
       // The card offers Version A/B with editable fields — the selected
       // version, WITH the user's edits, is exactly what sends.
@@ -231,7 +249,7 @@ export async function resolveApprovalAction(formData: FormData) {
         editedBody || (useAlternate ? payload.draft?.alternate_body : payload.draft?.body);
       if (
         approval &&
-        ["send_outreach", "send_followup"].includes(approval.approvalType) &&
+        ["send_outreach", "send_followup", "sequence_email"].includes(approval.approvalType) &&
         subject &&
         body
       ) {
@@ -245,6 +263,10 @@ export async function resolveApprovalAction(formData: FormData) {
           subject,
           body,
           opportunityId: payload.opportunityId,
+          accountId: payload.accountId,
+          contactId: payload.contactId,
+          enrollmentId: payload.enrollmentId,
+          step: payload.step,
         });
         console.log(`[send-queue] approval ${approvalId} queued for ${sendAt.toISOString()}`);
         if (payload.followupId) {
@@ -1121,4 +1143,42 @@ export async function createAccountAction(formData: FormData) {
   });
   revalidatePath("/accounts");
   revalidatePath("/");
+}
+
+// Texas outreach: approve every listed draft exactly as written (Rameel
+// 2026-10-01 — he reviews each email; this saves 15 clicks once he has).
+// Each one queues into the normal 9am–5:30pm, ~5-minute-apart send window.
+export async function approveSequenceBatchAction(formData: FormData) {
+  const ids = formData.getAll("approvalId").map(String).filter(Boolean);
+  if (!ids.length) return;
+  const db = await getDb();
+  const { approvals } = await import("@/lib/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  const { queueEmail } = await import("@/lib/outbound/send-queue");
+  for (const id of ids) {
+    const approval = await db.query.approvals.findFirst({
+      where: and(eq(approvals.id, id), eq(approvals.status, "pending"), eq(approvals.approvalType, "sequence_email")),
+    });
+    if (!approval) continue;
+    const p = (approval.payload ?? {}) as {
+      draft?: { subject?: string; body?: string; suggested_email?: string };
+      enrollmentId?: string;
+      step?: number;
+      accountId?: string;
+      contactId?: string;
+    };
+    if (!p.draft?.subject || !p.draft.body || !p.draft.suggested_email) continue;
+    await resolveApproval(db, id, "approved", { resolvedBy: "user" });
+    await queueEmail(db, id, {
+      channel: "email",
+      to: p.draft.suggested_email,
+      subject: p.draft.subject,
+      body: p.draft.body,
+      accountId: p.accountId,
+      contactId: p.contactId,
+      enrollmentId: p.enrollmentId,
+      step: p.step,
+    });
+  }
+  revalidatePath("/researched");
 }

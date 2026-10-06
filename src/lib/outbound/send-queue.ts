@@ -128,6 +128,8 @@ export async function processSendQueue(db: Db): Promise<number> {
         opportunityId: q.opportunityId,
         accountId: q.accountId,
         contactId: q.contactId,
+        enrollmentId: q.enrollmentId,
+        step: q.step,
       });
       sent++;
     } catch (err) {

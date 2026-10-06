@@ -18,9 +18,10 @@ import {
   setOpportunityStageAction,
   addContactEmailAction,
   cancelQueuedSendAction,
+  approveSequenceBatchAction,
 } from "@/app/actions";
 import { EmailApprovalCard, SwarmApprovalCard } from "./email-card";
-import { BidDesk } from "./bid-desk";
+import { outreachStats } from "@/lib/outbound/prospecting";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,10 @@ export const dynamic = "force-dynamic";
 // research cards, self-contained (lead, human "how to approach", contact
 // chips, actions). Outbox = every draft waiting on a human — outreach emails,
 // swarm sequences, ABM/publish approvals — plus what recently went out.
-// Bids = the bid desk.
+// The Bids tab was removed 2026-10-01 (Jamal works PlanHub directly; the bid
+// desk code stays in bid-desk.tsx if it ever comes back).
 
-const EMAIL_TYPES = ["send_outreach", "send_followup"];
+const EMAIL_TYPES = ["send_outreach", "send_followup", "sequence_email"];
 
 export default async function ResearchedPage({
   searchParams,
@@ -109,9 +111,15 @@ export default async function ResearchedPage({
 
   // Outbox: everything drafted and waiting, plus what recently went out.
   const pendingEmails = await db.query.approvals.findMany({
-    where: and(eq(approvals.status, "pending"), inArray(approvals.approvalType, EMAIL_TYPES)),
+    where: and(eq(approvals.status, "pending"), inArray(approvals.approvalType, ["send_outreach", "send_followup"])),
     orderBy: desc(approvals.requestedAt),
   });
+  // Texas outreach drafts (approved templates, merge fields filled).
+  const sequencePending = await db.query.approvals.findMany({
+    where: and(eq(approvals.status, "pending"), eq(approvals.approvalType, "sequence_email")),
+    orderBy: approvals.requestedAt,
+  });
+  const texas = await outreachStats(db);
   const swarmApprovals = await db.query.approvals.findMany({
     where: and(eq(approvals.status, "pending"), eq(approvals.approvalType, "swarm_outreach")),
     orderBy: desc(approvals.requestedAt),
@@ -155,7 +163,8 @@ export default async function ResearchedPage({
       limit: 10,
     })
   ).filter((a) => (a.payload as { sentTo?: string })?.sentTo);
-  const outboxCount = pendingEmails.length + swarmApprovals.length + otherApprovals.length;
+  const outboxCount =
+    pendingEmails.length + sequencePending.length + swarmApprovals.length + otherApprovals.length;
 
   // Which companies already have a draft waiting (link the card to the Outbox).
   const draftsByAccount = new Map<string, number>();
@@ -181,10 +190,9 @@ export default async function ResearchedPage({
 
   const tabs = [
     { key: "companies", label: "Companies", count: rows.length },
-    { key: "outbox", label: "Outbox", count: outboxCount },
-    { key: "bids", label: "Bids", count: null as number | null },
+    { key: "outbox", label: "Outbox", count: outboxCount as number | null },
   ];
-  const activeTab = tab === "bids" ? "bids" : tab === "outbox" ? "outbox" : "companies";
+  const activeTab = tab === "outbox" ? "outbox" : "companies";
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -215,9 +223,7 @@ export default async function ResearchedPage({
         ))}
       </div>
 
-      {activeTab === "bids" ? (
-        <BidDesk />
-      ) : activeTab === "outbox" ? (
+      {activeTab === "outbox" ? (
         <div className="space-y-4">
           <p className="text-xs text-steel">
             Everything drafted and waiting on you. Review, edit, and approve — nothing sends
@@ -232,6 +238,37 @@ export default async function ResearchedPage({
               draft lands here.
             </p>
           )}
+
+          <section className="space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink-700">
+                Texas outreach ({sequencePending.length} waiting)
+              </h2>
+              <span className="text-xs text-steel">
+                {texas.people} people · {texas.emailed} emailed · {texas.replied} replied ·{" "}
+                {texas.bounced} bounced
+              </span>
+            </div>
+            <p className="text-xs text-steel">
+              Contractors, property managers, developers, and architects across Texas, on your
+              approved templates. Edit any email and approve it on its own, or approve the whole
+              batch as written. Discarding one ends that person&apos;s sequence. A reply stops it
+              automatically.
+            </p>
+            {sequencePending.length > 1 && (
+              <form action={approveSequenceBatchAction}>
+                {sequencePending.map((a) => (
+                  <input key={a.id} type="hidden" name="approvalId" value={a.id} />
+                ))}
+                <SubmitButton className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+                  Approve all {sequencePending.length} as written
+                </SubmitButton>
+              </form>
+            )}
+            {sequencePending.map((a) => (
+              <EmailApprovalCard key={a.id} approval={a} />
+            ))}
+          </section>
 
           {pendingEmails.map((a) => (
             <EmailApprovalCard key={a.id} approval={a} />

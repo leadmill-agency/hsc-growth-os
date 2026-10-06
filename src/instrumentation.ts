@@ -162,10 +162,12 @@ export async function register() {
       console.error("[scheduler] weekly SEO scan failed:", err);
     }
 
-    // Daily web Expansion Scout (franchises/developments/operators — radar PRD §5)
+    // Daily web Expansion Scout (franchises/developments/operators — radar PRD §5).
+    // PAUSED (Rameel 2026-10-01): franchise cold email got 0 replies in 35
+    // sends. Set SCOUT_ENABLED=true to bring it back.
     try {
       const hourUtc = new Date().getUTCHours();
-      if (hourUtc >= 13) {
+      if (hourUtc >= 13 && process.env.SCOUT_ENABLED === "true") {
         const { scoutRanToday, runExpansionScout } = await import("@/lib/integrations/scout/client");
         if (!(await scoutRanToday(db))) {
           console.log("[scheduler] running daily expansion scout");
@@ -177,6 +179,32 @@ export async function register() {
       console.error("[scheduler] expansion scout failed:", err);
     }
   };
+
+  // Texas repeat-buyer outreach (Rameel 2026-10-01): weekday mornings, build a
+  // batch of new contractors / property managers / developers / architects
+  // from Apollo and draft email 1 into the Outbox; draft due follow-ups every
+  // tick. Nothing sends without approval. OUTREACH_ENABLED gates it.
+  const outreachTick = async () => {
+    if (process.env.OUTREACH_ENABLED !== "true") return;
+    try {
+      const { getDb } = await import("@/lib/db/client");
+      const db = await getDb();
+      const prospecting = await import("@/lib/outbound/prospecting");
+      const now = new Date();
+      const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short" }).format(now);
+      if (now.getUTCHours() >= 13 && !["Sat", "Sun"].includes(weekday) && !(await prospecting.outreachBatchBuiltToday(db))) {
+        console.log("[outreach] building today's Texas outreach batch");
+        const r = await prospecting.buildDailyOutreachBatch(db);
+        console.log(`[outreach] batch: ${JSON.stringify(r.created)} (${r.reveals} reveals${r.quotaHit ? ", Apollo quota hit" : ""})`);
+      }
+      const drafted = await prospecting.draftDueSequenceFollowups(db);
+      if (drafted) console.log(`[outreach] drafted ${drafted} follow-up(s)`);
+    } catch (err) {
+      console.error("[outreach] tick failed:", err);
+    }
+  };
+  setInterval(outreachTick, 15 * 60 * 1000);
+  setTimeout(outreachTick, 2 * 60 * 1000);
 
   // Minute-level send-queue tick: queued emails deliver 9:00am–5:30pm Houston
   // time, ~5 minutes apart (Rameel 2026-09-21) — needs finer granularity than
