@@ -106,6 +106,24 @@ UI flow, owner rules in force, live numbers, and the prioritized open items.
 - **Cross-bundle module state is unreliable in Next**: the send layer lazily self-registers
   the Resend adapter — never assume a boot-time singleton is visible from a server action.
 
+### Texas outreach lane (2026-10-01)
+- **Template words are Rameel's.** `src/lib/outbound/templates.ts` mirrors
+  `docs/outbound-templates-v1.md` (v3). Only `{{first_name}}`, `{{company}}`,
+  `{{local_line}}` are filled. Never route this copy through an LLM; change it only with his
+  written approval.
+- **Every touch waits for approval** (`sequence_email` approvals in the Outbox). He wants to
+  review emails for the first days; don't add auto-send without asking him.
+- **Sources: Apollo only.** Never PlanHub (Jamal works those GCs himself). Texas-wide
+  including Dallas. One person per company; only Apollo `verified` emails; sign companies
+  skipped. Revealed-but-unusable people are stored as `skipped` so a credit is never spent
+  twice on the same person.
+- **Sequence state lives in `outreach_enrollments`**, not opportunities — these accounts
+  never become cards. Follow-ups draft at 3 and 7 business days after email 1 sends, as
+  "Re: <subject>". Discarding a draft stops the sequence; a reply (same address, or anyone
+  at the same work domain) or bounce stops it via `/api/inbound`.
+- **Flags:** `OUTREACH_ENABLED`, `OUTREACH_NEW_PER_DAY` (15 at launch), `SEND_DAILY_CAP`
+  (30). Paused: `SCOUT_ENABLED` (franchise scout) and `BID_INTAKE_ENABLED` (PB10) are unset.
+
 ### Runs, AI, and cost
 - **The boot sweep must not steal runs**: scripts execute runs against the same database;
   boot threshold 10 min, steady 15 min (runs heartbeat `updatedAt` per step). Duplicate

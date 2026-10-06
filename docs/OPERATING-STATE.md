@@ -1,6 +1,6 @@
 # Growth OS — operating state (resume here)
 
-Last updated 2026-09-23. Read this first when you start a new session on the Growth OS.
+Last updated 2026-10-06. Read this first when you start a new session on the Growth OS.
 It describes what the portal does today, the owner's standing rules, the live numbers,
 and what is still open. Engineering rules learned in production are in
 [`AGENTS.md`](../AGENTS.md) under "Field-learned rules"; the product plan is the master PRD
@@ -15,6 +15,27 @@ jobs, he would scroll TDLR himself. Every screen should serve that goal.
 Production runs on Railway at `https://hsc-growth-os-production.up.railway.app`. Pushing
 to `main` deploys. The app sits behind a team password page (`APP_PASSWORD`). Never enter
 it in a browser; check changes by build, tests, and direct database queries instead.
+
+## The change on 2026-10-01: Texas repeat-buyer outreach
+
+Franchise cold email got **0 replies in 35 sends**, and the Bid invites tab went unused
+(552 invites, 4 ever estimated; Jamal works PlanHub directly). Rameel's new direction:
+become one of the 3–5 sign companies that **general contractors, property managers,
+developers, and architects across Texas (including Dallas)** email whenever signage comes
+up.
+
+- Every weekday morning the scheduler pulls about 15 new people from Apollo, split across
+  the four groups with contractors weighted highest. It drafts email 1 from Rameel's
+  approved templates (`docs/outbound-templates-v1.md`) into **Researched → Outbox → Texas
+  outreach**.
+- He reviews and approves each email, or uses "Approve all as written." Approved emails go
+  through the normal send queue.
+- Follow-ups draft themselves 3 and 7 business days after email 1. A reply or bounce stops
+  the person's sequence. Discarding a draft also stops it.
+- **Paused:** the franchise web scout and PlanHub bid intake (PB10). The Bids tabs are
+  hidden. TDLR and City of Houston intake still feed Opportunities.
+- **The measure of success** is contractors adding HSC to their bid lists and sending
+  invites. Count those, not reply rates alone.
 
 ## How a lead moves through the portal
 
@@ -81,7 +102,11 @@ it in a browser; check changes by build, tests, and direct database queries inst
 
 ## Open items, most urgent first
 
-1. **Incoming bids are failing (PB10).** Two PlanHub invites (9/22 and 9/23) failed at the
+0. **Reply detection needs one Gmail filter (Rameel).** Replies reach the portal only if
+   ray@htxsigncrafters.com forwards them to the same Resend receiving address the PlanHub
+   filter uses. Until that filter exists, replies won't stop follow-ups automatically;
+   discard the follow-up draft by hand.
+1. **Incoming bids are failing (PB10).** Now low priority, since bid intake is paused.** Two PlanHub invites (9/22 and 9/23) failed at the
    `recommend` step with `Cannot read properties of undefined (reading 'opportunityId')`.
    The step reads `records.opportunityId`
    (`src/lib/ploybooks/pb10-incoming-bid/definition.ts` around line 207) when the step

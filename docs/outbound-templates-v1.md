@@ -1,4 +1,8 @@
-# Outbound templates v3: Rameel's direction
+# Outbound templates v3: approved and live
+
+Approved by Rameel 2026-10-01, with three changes: the street address goes on every
+email, the COI line stays, and Dallas is included. Live in `src/lib/outbound/templates.ts`.
+Change the copy only with his written approval, and change both files together.
 
 Updated 2026-10-01. This version replaces v2. The goal changed: we're not trying to catch
 someone in the middle of a project. We're trying to become one of the 3–5 sign companies
@@ -14,7 +18,7 @@ Rules for this campaign:
 - General contractors are the strongest group, because they already keep bid lists.
   Put the most effort into that list.
 
-Nothing sends until Rameel approves the final copy.
+Every email still waits for Rameel's approval in the Outbox.
 
 | Touch | When |
 |---|---|
@@ -34,7 +38,7 @@ Follow-ups reply in the same thread. Any reply stops the sequence.
 | Greater Houston | We're a Houston shop. |
 | San Antonio | We're a Houston shop with people on the ground in San Antonio. |
 | Austin | We're a Houston shop with people on the ground in Austin. |
-| Dallas–Fort Worth | Needs Rameel's answer (question 1) |
+| Dallas–Fort Worth and the rest of Texas | We're a Houston shop and we take work all over Texas. |
 
 ---
 
@@ -241,24 +245,15 @@ Follow-ups reply in the same thread. Any reply stops the sequence.
 
 ---
 
+## Signature
+
+Every email ends with the street address (1359 E 40th St, Houston, TX 77022): the full
+signature on email 1, and "Houston Sign Crafters, 1359 E 40th St, Houston, TX 77022"
+under "Ray" on follow-ups.
+
 ## Claim check
 
 Supported by the website or by Rameel in writing: in-house drawings, permits, fabrication,
 and install; cabinets, monuments, pylons, and awnings built in-house; repairs on signs we
 didn't build; tenant panels; LED work; the At Home and Kirkwood Tech Center installs;
-people in San Antonio and Austin.
-
-Still needs Rameel's confirmation:
-- **"We can send over our W-9 and COI as well"** (GC follow-up 1). Insurance has never
-  been confirmed in writing. Keep the line only if a current certificate of insurance
-  exists and can go out on request.
-- **"The other random sign scopes"** (GC email 1). This invites interior plaques, room
-  signs, banners, and vinyl, which HSC doesn't want (9/19 and 9/30 rules). Fine if
-  Jamal will pass on those invites. Otherwise, "the smaller sign scopes" is safer.
-
-## Open questions
-
-1. **Dallas–Fort Worth:** do you install there, and with whose crew?
-2. **Street address in the signature:** commercial email law (CAN-SPAM) requires a
-   physical address. Adding "1359 E 40th St, Houston, TX 77022" under the website line is
-   the cheap fix.
+people in San Antonio and Austin; the W-9 and COI offer (Rameel, 2026-10-01).
