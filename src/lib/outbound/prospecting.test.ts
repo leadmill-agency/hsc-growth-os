@@ -100,6 +100,10 @@ describe("daily batch", () => {
     expect(draft.body).toContain("We're a Houston shop and we take work all over Texas.");
     expect(draft.suggested_email).toBe("edward@gagecc.com");
 
+    // Every group gets its own reveal budget (2026-10-06: a shared counter
+    // starved the last group, architects, on the first live batch).
+    expect(r.created.property_manager).toBe(1);
+
     // Second run the same day: nobody is revealed or enrolled twice.
     const again = await buildDailyOutreachBatch(db, { total: 20 });
     expect(again.reveals).toBe(0);

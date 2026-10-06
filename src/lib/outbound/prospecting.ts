@@ -175,7 +175,7 @@ async function createSequenceApproval(db: Db, input: { title: string; payload: R
 }
 
 /** Morning batch: find new Texas people in Apollo, enroll them, draft email 1. */
-export async function buildDailyOutreachBatch(db: Db, opts: { total?: number } = {}) {
+export async function buildDailyOutreachBatch(db: Db, opts: { total?: number; only?: Segment[] } = {}) {
   const quotas = segmentQuotas(opts.total ?? newPerDay());
   const last = await db.query.events.findFirst({
     where: eq(events.eventType, "outreach.batch_built"),
@@ -202,8 +202,9 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number } =
   const created: Record<string, number> = {};
   let reveals = 0;
   let quotaHit = false;
-  for (const segment of SEGMENTS) {
+  for (const segment of opts.only ?? SEGMENTS) {
     created[segment] = 0;
+    let segmentReveals = 0;
     const want = quotas[segment];
     const cfg = SEGMENT_SEARCH[segment];
     for (let pageTry = 0; pageTry < 4 && created[segment] < want && !quotaHit; pageTry++) {
@@ -224,10 +225,11 @@ export async function buildDailyOutreachBatch(db: Db, opts: { total?: number } =
         if (created[segment] >= want) break;
         if (!hit.hasEmail || !hit.orgName || SKIP_ORG.test(hit.orgName)) continue;
         if (enrolledPeople.has(hit.id) || enrolledOrgSlugs.has(slugify(hit.orgName))) continue;
-        if (reveals >= want * 3 + 4) break; // credit guard per group per day
+        if (segmentReveals >= want * 3 + 4) break; // credit guard per group per day
         let person;
         try {
           reveals++;
+          segmentReveals++;
           person = await revealApolloPerson(hit.id);
         } catch (err) {
           if (err instanceof FinderQuotaError) {
