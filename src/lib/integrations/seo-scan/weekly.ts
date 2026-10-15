@@ -41,13 +41,16 @@ export const SEO_GEOGRAPHIES = [
 // orders — pole/pylon, monument, storefront/channel letters. Banners, wall
 // vinyl, and vehicle wraps are outsourced pass-throughs and never get pages
 // or articles from this scan.
-// Monument Signs and Storefront Signs left the city matrix 2026-10-15:
-// monuments only sell alongside storefront work (Rameel 2026-09-26), and a
-// city × storefront page is a twin of the city × channel letters page (the
-// 9/28 Katy storefront draft was exactly that, so it was skipped).
+// Product focus per Rameel 2026-10-15: storefront/channel letters, pylon and
+// pole, monument, repair, awnings, plus interior, ADA, and flat acrylic
+// letters (those three sell best inside a package, so they get articles, not
+// city pages). Storefront Signs stays OUT of the city matrix: a city ×
+// storefront page twins the city × channel letters page (the 9/28 Katy draft).
 export const SEO_PRODUCTS = [
   "Channel Letter Signs",
-  "Pole Signs",
+  "Pylon Signs",
+  "Monument Signs",
+  "Sign Repair",
   // Growth line per Rameel 2026-09-19 — statewide service area, GC-bid heavy,
   // fabricated in-house like signs (Rameel corrected this 2026-09-19).
   "Commercial Awnings",
@@ -80,6 +83,11 @@ export const CONTENT_TOPICS = [
   "Fabric awning vs metal canopy for a commercial building",
   "Walkway canopies for schools and churches: what does the project involve?",
   "How to choose a sign company for a commercial project",
+  // Interior and ADA joined the focus 2026-10-15 (sold best inside a package).
+  "ADA signs for commercial buildings in Texas: what the rules require",
+  "Lobby signs: lit vs non-lit, and what each costs to run",
+  "Flat acrylic letters vs channel letters: which does your space need?",
+  "One sign company for the whole building: exterior, interior, and ADA",
 ];
 
 /** Diagonal traversal of the city × product grid so early weeks vary both axes. */
