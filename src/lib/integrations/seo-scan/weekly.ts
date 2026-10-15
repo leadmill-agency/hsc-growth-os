@@ -41,10 +41,12 @@ export const SEO_GEOGRAPHIES = [
 // orders — pole/pylon, monument, storefront/channel letters. Banners, wall
 // vinyl, and vehicle wraps are outsourced pass-throughs and never get pages
 // or articles from this scan.
+// Monument Signs and Storefront Signs left the city matrix 2026-10-15:
+// monuments only sell alongside storefront work (Rameel 2026-09-26), and a
+// city × storefront page is a twin of the city × channel letters page (the
+// 9/28 Katy storefront draft was exactly that, so it was skipped).
 export const SEO_PRODUCTS = [
   "Channel Letter Signs",
-  "Monument Signs",
-  "Storefront Signs",
   "Pole Signs",
   // Growth line per Rameel 2026-09-19 — statewide service area, GC-bid heavy,
   // fabricated in-house like signs (Rameel corrected this 2026-09-19).
