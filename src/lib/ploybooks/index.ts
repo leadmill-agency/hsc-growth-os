@@ -17,6 +17,7 @@ import { pb14DealRoom } from "./pb14-deal-room/definition";
 import { pb15BusinessCase } from "./pb15-business-case/definition";
 import { pb16LocalSeo } from "./pb16-local-seo/definition";
 import { pb17ContentBuilder } from "./pb17-content-builder/definition";
+import { pb17PageImprover } from "./pb17-content-builder/improve";
 import { pb18GrowthOperator } from "./pb18-growth-operator/definition";
 
 // Register all ploybooks. Import this module once (server startup / test setup)
@@ -40,6 +41,7 @@ registerPloybook(pb14DealRoom);
 registerPloybook(pb15BusinessCase);
 registerPloybook(pb16LocalSeo);
 registerPloybook(pb17ContentBuilder);
+registerPloybook(pb17PageImprover);
 registerPloybook(pb18GrowthOperator);
 
 export * from "./types";

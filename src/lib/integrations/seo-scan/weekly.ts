@@ -6,6 +6,12 @@ import {
   findTopicCoveringUrls,
   topicsOverlap,
 } from "@/lib/integrations/website/sitemap";
+import {
+  comboDemand,
+  orderCombosByDemand,
+  pickImprovementTarget,
+  rankOpportunities,
+} from "./opportunities";
 
 // Weekly SEO + content scan (per Rameel 2026-09-18): every Monday morning the
 // system drafts ONE new city × product landing page (PB16) and ONE buyer-question
@@ -13,6 +19,11 @@ import {
 // goes on the website until a human approves and commits it. Targets are picked
 // from curated lists, skipping anything the live sitemap already covers and
 // anything a prior run already drafted.
+//
+// 2026-10-15 (Rameel: "build it that way"): targeting is now driven by Search
+// Console query × page data (opportunities.ts). Each week also drafts ONE
+// improvement to a page that already ranks 4th–30th (PB17b), new articles only
+// go to searches nothing ranks for, and city pages are ordered by demand.
 
 // Cities in HSC's real service area, highest-value first. The site's existing
 // /locations pages are general city pages — a city × product page is new inventory.
@@ -113,10 +124,11 @@ export function seoMatrixCombos(): string[] {
 export function pickNextSeoTargets(
   sitemapUrls: string[],
   priorInputs: { matrixInputs: string[]; topicInputs: string[] },
-  gapQueries: string[] = []
+  gapQueries: string[] = [],
+  opts: { comboOrder?: string[] } = {}
 ): { matrixInput: string | null; topicInput: string | null } {
   const matrixInput =
-    seoMatrixCombos().find((combo) => {
+    (opts.comboOrder ?? seoMatrixCombos()).find((combo) => {
       if (priorInputs.matrixInputs.includes(combo)) return false;
       const [geo, product] = combo.split("×").map((s) => s.trim());
       return findCoveringUrls(sitemapUrls, [geo, product]).length === 0;
@@ -180,16 +192,26 @@ export async function runWeeklySeoScan(db: Db, opts: { force?: boolean } = {}): 
   const { launchRun, executeRun } = await import("@/lib/ploybooks/runner");
   await import("@/lib/ploybooks");
 
-  // Live demand first: GSC queries with impressions but a poor rank become the
-  // article topic. If GSC is unreachable, the curated backlog carries the week.
+  // Live demand first. Search Console query × page rows are scored: searches a
+  // page already ranks 4th–30th for become a page improvement; searches nothing
+  // ranks for become article candidates; city mentions order the city pages.
+  // If GSC is unreachable, the curated lists carry the week.
   let gapQueries: string[] = [];
+  let comboOrder: string[] | undefined;
+  let improvement: ReturnType<typeof pickImprovementTarget> = null;
   try {
-    const { fetchContentGaps } = await import("@/lib/integrations/gsc/client");
-    const gaps = await fetchContentGaps({ days: 28, minImpressions: 10, minPosition: 8, limit: 15 });
-    gapQueries = gaps.map((g) => g.query);
-    if (gapQueries.length) log.push(`GSC gaps: ${gapQueries.length} candidate topic(s), top "${gapQueries[0]}"`);
+    const { fetchQueryPageRows } = await import("@/lib/integrations/gsc/client");
+    const rows = await fetchQueryPageRows({ days: 28 });
+    const opps = rankOpportunities(rows, sitemapUrls);
+    gapQueries = opps.filter((o) => o.kind === "new_article").map((o) => o.query);
+    comboOrder = orderCombosByDemand(seoMatrixCombos(), comboDemand(rows, seoMatrixCombos()));
+    improvement = pickImprovementTarget(opps, await recentImprovementTargets(db));
+    log.push(
+      `GSC: ${opps.length} scored opportunities (${opps.filter((o) => o.kind === "improve_page").length} page improvements, ${gapQueries.length} article gaps)` +
+        (opps[0] ? `; top "${opps[0].query}" (${opps[0].reason})` : "")
+    );
   } catch (err) {
-    log.push(`GSC gaps unavailable (${err instanceof Error ? err.message : err}) — using topic backlog`);
+    log.push(`GSC unavailable (${err instanceof Error ? err.message : err}) — using curated lists`);
   }
 
   const targets = pickNextSeoTargets(
@@ -198,7 +220,8 @@ export async function runWeeklySeoScan(db: Db, opts: { force?: boolean } = {}): 
       matrixInputs: await priorInputsFor(db, "pb16_local_seo", "matrixInput"),
       topicInputs: await priorInputsFor(db, "pb17_content_builder", "topicInput"),
     },
-    gapQueries
+    gapQueries,
+    { comboOrder }
   );
 
   if (!opts.force && (await ranSince(db, "pb16_local_seo", weekStart))) {
@@ -231,14 +254,54 @@ export async function runWeeklySeoScan(db: Db, opts: { force?: boolean } = {}): 
     log.push(`PB17: drafted "${targets.topicInput}" (run ${runId})`);
   }
 
+  // PB17b: improve the page with the most ranking upside this week.
+  if (!opts.force && (await ranSince(db, "pb17_page_improver", weekStart))) {
+    log.push("PB17b: already ran this week, skipping");
+  } else if (!improvement) {
+    log.push("PB17b: no page in positions 4–30 worth improving this week");
+  } else {
+    const runId = await launchRun(db, {
+      ploybookKey: "pb17_page_improver",
+      triggerType: "scheduled",
+      triggerPayload: {
+        targetPage: improvement.page,
+        queries: improvement.queries,
+        reasons: improvement.reasons,
+      },
+      initiatedBy: "system",
+    });
+    await executeRun(db, runId);
+    log.push(`PB17b: drafted an improvement for ${improvement.page} (score ${improvement.score}, run ${runId})`);
+  }
+
+  // One scan per week, even when a step had nothing to draft (otherwise the
+  // 15-minute scheduler would retry all week).
+  const { emitEvent } = await import("@/lib/events");
+  await emitEvent(db, { eventType: "seo.weekly_scan_ran", payload: { log } });
   return log;
+}
+
+/** Pages improved in the last 4 weeks — give Google time to react before touching them again. */
+async function recentImprovementTargets(db: Db): Promise<string[]> {
+  const since = new Date(Date.now() - 28 * 864e5).toISOString();
+  const rows = asRows<{ page: string | null }>(
+    await db.execute(
+      sql`select r.trigger_payload ->> 'targetPage' as page
+          from ploybook_runs r join ploybooks p on p.id = r.ploybook_id
+          where p.key = 'pb17_page_improver' and r.status != 'failed' and r.created_at >= ${since}`
+    )
+  );
+  return rows.map((r) => r.page).filter((v): v is string => !!v);
 }
 
 /** True when the weekly scan still owes a run for the current week. */
 export async function weeklySeoScanDue(db: Db): Promise<boolean> {
   const weekStart = startOfWeekUtc();
-  return (
-    !(await ranSince(db, "pb16_local_seo", weekStart)) ||
-    !(await ranSince(db, "pb17_content_builder", weekStart))
+  const rows = asRows(
+    await db.execute(
+      sql`select 1 from events where event_type = 'seo.weekly_scan_ran'
+          and occurred_at >= ${weekStart.toISOString()} limit 1`
+    )
   );
+  return rows.length === 0;
 }

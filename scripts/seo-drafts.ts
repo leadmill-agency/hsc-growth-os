@@ -2,7 +2,7 @@
 // just do the seo work to publish?"). Used by the weekly publish task.
 //
 //   npx tsx scripts/seo-drafts.ts list [outFile]
-//       Unhandled PB16/PB17 drafts (publish_page / publish_content that are
+//       Unhandled PB16/PB17/PB17b drafts (publish_page / publish_content / improve_page that are
 //       pending, or approved but never published). Full drafts go to outFile
 //       (JSON) when given; a summary prints either way.
 //   npx tsx scripts/seo-drafts.ts resolve <approvalId> <published|skipped> "<note>" [liveUrl]
@@ -27,7 +27,7 @@ async function main() {
       .from(approvals)
       .where(
         and(
-          inArray(approvals.approvalType, ["publish_page", "publish_content"]),
+          inArray(approvals.approvalType, ["publish_page", "publish_content", "improve_page"]),
           inArray(approvals.status, ["pending", "approved", "edited"]),
           sql`${approvals.resolutionPayload}->>'publishOutcome' is null`
         )
