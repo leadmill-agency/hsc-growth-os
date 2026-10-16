@@ -124,7 +124,9 @@ up.
    published anything: 4 approved drafts sat unpublished until 10/15. Publishing is now a
    weekly Claude job (prompt: `HSC/_project/weekly-seo-publish-task.md`, Tuesdays 9am). It
    uses `scripts/seo-drafts.ts` to list unhandled drafts and record each outcome. The scan
-   no longer drafts monument or storefront city pages. Every draft through 10/12 is handled:
+   is now driven by Search Console data. Each week it drafts one improvement to the page
+   with the most ranking upside (PB17b), one city page chosen by search demand, and one
+   article for a search nothing ranks for. Every draft through 10/12 is handled:
    The Woodlands channel letters page went live 10/15, and the rest were skipped with reasons.
 5. **Not built yet:** detecting replies (a reply should pause follow-ups and flag the
    company) and chasing supplier quotes for bids.

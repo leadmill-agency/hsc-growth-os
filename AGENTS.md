@@ -141,8 +141,19 @@ UI flow, owner rules in force, live numbers, and the prioritized open items.
   was one-time backfills + parallel deep research.
 
 ### SEO scan
-- Mondays: PB16 city × product page + PB17 article, topics from live GSC gaps first
-  (backlog fallback), filtered by `OFF_FOCUS_PATTERN` (banners/vinyl/wraps never).
+- **Opportunity-driven since 2026-10-15** (`seo-scan/opportunities.ts`). Search Console
+  query × page rows are scored as impressions × closeness to page one × focus product (1.5×).
+  A page already ranking 4th–30th gets a PB17b `improve_page` draft. When the homepage
+  outranks a matching service page, the service page is the target. Articles (PB17) only
+  go to searches nothing ranks for in the top 30. City × product pages (PB16) are ordered
+  by city-name search demand. Never improve the homepage (other sessions own it), and
+  don't re-improve a page within 28 days. The scan runs once a week via the
+  `seo.weekly_scan_ran` event.
+- **Approving a draft in the portal publishes nothing.** The Tuesday scheduled task
+  `hsc-weekly-seo-publish` (prompt in `HSC/_project/weekly-seo-publish-task.md`) applies
+  drafts to the website repo and records outcomes with `scripts/seo-drafts.ts`.
+- Mondays (legacy note): PB16 city × product page + PB17 article, filtered by
+  `OFF_FOCUS_PATTERN` (banners/vinyl/wraps never).
   Products include Commercial Awnings (statewide; in-house fabrication; no warranty or
   price claims until confirmed). Coverage checks are keyword-STEM based; when a draft
   overlaps an existing page, MERGE into that URL — never publish a twin.
